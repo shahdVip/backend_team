@@ -25,7 +25,7 @@ const initApp = () => {
       ],
     })
   );
-  console.log("njkfdnkjf");
+  console.log("testinit");
 
   app.use(express.json());
 

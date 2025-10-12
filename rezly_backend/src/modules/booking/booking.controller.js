@@ -336,7 +336,8 @@ export const updateBooking = async (req, res, next) => {
 
     // ===== تحديد الحجوزات =====
     let bookingsToUpdate = [];
-    let existingBooking = null;if (updateGroup === "true") {
+    let existingBooking = null;
+    if (updateGroup === "true") {
   // كل الحجوزات بنفس groupId
   bookingsToUpdate = await Booking.find({ groupId: bookingIdOrGroupId });
   if (!bookingsToUpdate.length)
@@ -434,57 +435,71 @@ export const updateBooking = async (req, res, next) => {
       await BookingMember.insertMany(bookingMembers);
     }
 
-    // ===== التعامل مع recurrence وحذف الحجوزات الزائدة =====
-    let createdBookings = [...bookingsToUpdate];
-    let conflictedDays = [];
+  // ===== التعامل مع recurrence وحذف الحجوزات الزائدة =====
+let createdBookings = [...bookingsToUpdate];
+let conflictedDays = [];
+if (updateGroup === "true" && recurrence.length && subscriptionDuration) {
+  const groupId = bookingIdOrGroupId;
+  const weekMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const weeksToRepeat = {
+    "1week": 1, "2weeks": 2, "3weeks": 3,
+    "1month": 4, "3months": 12, "6months": 24, "1year": 52
+  }[subscriptionDuration] || 1;
 
-    if (recurrence.length && subscriptionDuration) {
-      const weekMap = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
-      const weeksToRepeat = { "1week":1,"2weeks":2,"3weeks":3,"1month":4,"3months":12,"6months":24,"1year":52 }[subscriptionDuration] || 1;
+  const baseDate = new Date(date);
+  let plannedDates = [baseDate.toISOString().split("T")[0]]; // التاريخ الأصلي أولاً
 
-      // احسب التواريخ الجديدة
-      let plannedDates = [];
-      for (let w=0; w<weeksToRepeat; w++){
-        for (const day of recurrence){
-          const dayIndex = weekMap[day];
-          const offset = (dayIndex - new Date(date).getDay() + 7)%7;
-          const newDate = new Date(date);
-          newDate.setDate(newDate.getDate() + offset + w*7);
-          plannedDates.push(newDate.toISOString().split("T")[0]);
-        }
-      }
+  // حساب جميع التواريخ الجديدة حسب recurrence
+  for (let w = 0; w < weeksToRepeat; w++) {
+    for (const day of recurrence) {
+      const targetDayIndex = weekMap[day];
+      const newDate = new Date(baseDate);
+      newDate.setDate(baseDate.getDate() + (targetDayIndex - baseDate.getDay() + 7) % 7 + w * 7);
+      plannedDates.push(newDate.toISOString().split("T")[0]);
+    }
+  }
 
-      // حذف أي حجوزات موجودة خارج plannedDates (لـ groupId)
-      if (updateGroup === "true") {
-        await Booking.deleteMany({
-          groupId: bookingIdOrGroupId,
-          date: { $nin: plannedDates }
-        });
-      }
+  // 🧹 حذف كل الحجوزات القديمة + BookingMember المرتبط
+  const oldBookings = await Booking.find({ groupId });
+  const oldBookingIds = oldBookings.map(b => b._id);
+  await BookingMember.deleteMany({ booking: { $in: oldBookingIds } });
+  await Booking.deleteMany({ groupId });
 
-      // إضافة الحجوزات الجديدة مع التحقق من التعارض
-      for (const newDateStr of plannedDates) {
-        if (bookingsToUpdate.some(b => b.date.toISOString().split("T")[0] === newDateStr)) continue;
-        if (await conflict("coach", newDateStr) || await conflict("location", newDateStr)) {
-          conflictedDays.push({ date:newDateStr, reason: "Conflict" });
-          continue;
-        }
-        const newB = await Booking.create({
-          service, description, coach:finalCoachId, location,
-          date:newDateStr, timeStart, timeEnd, maxMembers,
-          recurrence, reminders, subscriptionDuration,
-          groupId: existingBooking ? existingBooking.groupId : bookingIdOrGroupId
-        });
-        createdBookings.push(newB);
-      }
+  console.log("✅ Deleted old Bookings and BookingMember records for group:", groupId);
+
+  // ⚡ إنشاء الحجوزات الجديدة فقط إذا لا يوجد تعارض
+  const newBookings = [];
+  for (const newDateStr of plannedDates) {
+    if (await conflict("coach", newDateStr) || await conflict("location", newDateStr)) {
+      conflictedDays.push({ date: newDateStr, reason: "Conflict" });
+      continue; // لن يتم إنشاء هذا الحجز
     }
 
-    return res.status(200).json({
-      status:"success",
-      data:createdBookings,
-      conflictedDays,
-      message:"Booking updated successfully"
+    newBookings.push({
+      service,
+      description,
+      coach: finalCoachId,
+      location,
+      date: newDateStr,
+      timeStart,
+      timeEnd,
+      maxMembers,
+      recurrence,
+      reminders,
+      subscriptionDuration,
+      groupId
     });
+  }
+
+  createdBookings = await Booking.insertMany(newBookings);
+}
+
+return res.status(200).json({
+  status: "success",
+  data: createdBookings,
+  conflictedDays,
+  message: "Booking updated successfully"
+});
 
   } catch (err) {
     console.error("Booking update error:", err);
