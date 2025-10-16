@@ -17,7 +17,7 @@ router.post('/SignIn',validation(schema.SignInSchema),asyncHandler(authControlle
 router.post("/addNewMember", auth([ roles.Admin]), validation(schema.createMemberSchema), asyncHandler(authController.createMember));
 router.put("/updateMember/:id", auth([ roles.Admin]), validation(schema.updateMemberSchema), asyncHandler(authController.updateMember));
 router.get("/getAllMembers", auth([ roles.Admin]), asyncHandler(authController.getAllMembers));
-
+router.delete("/deleteMember/:id", auth([ roles.Admin]), asyncHandler(authController.deleteMember));
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 ميجا كحد أقصى

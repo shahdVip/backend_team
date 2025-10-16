@@ -506,6 +506,40 @@ export const updateMember = async (req, res, next) => {
     next(error);
   }
 };
+//////////////////// DELETE MEMBER ////////////////////
+export const deleteMember = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // فقط الأدمن يقدر يحذف
+    if (req.user.role !== "Admin") {
+      return next(new AppError("غير مصرح لك بحذف المشتركين", 403));
+    }
+
+    // التحقق من وجود المشترك
+    const member = await userModel.findById(id);
+    if (!member) {
+      return next(new AppError("المشترك غير موجود", 404));
+    }
+
+    // إذا كان للمشترك مدرب، احذف العلاقة بينهما
+    if (member.coachId) {
+      await userModel.findByIdAndUpdate(member.coachId, {
+        $pull: { members: member._id },
+      });
+    }
+
+    // حذف المشترك فعليًا
+    await userModel.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      message: "تم حذف المشترك بنجاح",
+      deletedMemberId: id,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const getAllMembers = async (req, res, next) => {
   try {
