@@ -585,67 +585,69 @@ export const deleteBooking = async (req, res, next) => {
     next(err);
   }
 };
-
-
-
 export const filterBookings = async (req, res) => {
   try {
-    const { userId, user } = req;
+    const { userId, user } = req;  // userId من JWT
     const role = user.role.toLowerCase();
-    const { date, coachId, location } = req.query;
-console.log(userId);
-console.log(role);
-   let query = {};
+    const { location, date, coachId } = req.query;
 
-if (role === "admin") {
-   if (coachId) query.coach = new mongoose.Types.ObjectId(coachId);
-} else if (role === "coach") {
-  query.coach = userId;
-} else {
-  query.members = { $elemMatch: { member: userId } };
+    console.log("UserId:", userId);
+    console.log("Role:", role);
+
+    let query = {};
+
+    // ===== صلاحيات المستخدم =====
+    if (role === "coach") {
+      query.coach = new mongoose.Types.ObjectId(userId); // الكوتش يشوف حجوزاته فقط
+    } else if (role === "admin" && coachId) {
+      query.coach = new mongoose.Types.ObjectId(coachId); // الادمن يفلتر حسب الكوتش
+    } else if (role !== "admin" && role !== "coach") {
+      query.members = { $elemMatch: { member: new mongoose.Types.ObjectId(userId) } };
+    }
+
+    // ===== فلترة الموقع =====
+ if (location) {
+  query.location = { $regex: new RegExp(location.trim(), "i") };
 }
 
-if (date) query.date = new Date(date);  // لازم يكون Date object
 
-    if (location) query.location = location;
-console.log(query);
+    // ===== فلترة التاريخ ليوم محدد =====
+    if (date) {
+      const start = new Date(date);
+      start.setUTCHours(0, 0, 0, 0);
+
+      const end = new Date(date);
+      end.setUTCHours(23, 59, 59, 999);
+
+      query.date = { $gte: start, $lte: end };
+    }
+
     console.log("Final query:", query);
 
-    const bookings = await Booking.aggregate([
-      { $match: query },
-      {
-        $lookup: {
-          from: "bookingmembers",        // collection اسمها BookingMember (Mongo يحولها lowercase + جمع)
-          localField: "_id",
-          foreignField: "booking",
-          as: "members"
-        }
-      },
-      {
-        $lookup: {
-          from: "users",                 // ربط الـ coach
-          localField: "coach",
-          foreignField: "_id",
-          as: "coach"
-        }
-      },
-      { $unwind: "$coach" },           // flatten coach
-    ]);
+    // ===== جلب الحجوزات مع أعضاء الحجز + بيانات الكوتش من Employee =====
+    const bookings = await Booking.find(query)
+      .populate("coach", "-password -refreshToken") // جلب بيانات الكوتش بدون الحقول الحساسة
+      .lean();
+
+    console.log("Bookings fetched:", bookings.length);
+
     return res.json({
       status: "success",
       data: bookings,
       metadata: { totalResults: bookings.length, message: "Bookings fetched successfully" },
-      message: "Success"
+      message: "Success",
     });
   } catch (err) {
+    console.error("Error filtering bookings:", err);
     return res.status(500).json({
       status: "error",
       data: [],
       metadata: { totalResults: 0, message: err.message },
-      message: "Error"
+      message: "Error",
     });
   }
 };
+
 
 export const calendarView = async (req, res) => {
   try {
