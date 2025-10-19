@@ -449,15 +449,19 @@ if (updateGroup === "true" && recurrence.length && subscriptionDuration) {
   const baseDate = new Date(date);
   let plannedDates = [baseDate.toISOString().split("T")[0]]; // التاريخ الأصلي أولاً
 
-  // حساب جميع التواريخ الجديدة حسب recurrence
-  for (let w = 0; w < weeksToRepeat; w++) {
-    for (const day of recurrence) {
-      const targetDayIndex = weekMap[day];
-      const newDate = new Date(baseDate);
-      newDate.setDate(baseDate.getDate() + (targetDayIndex - baseDate.getDay() + 7) % 7 + w * 7);
-      plannedDates.push(newDate.toISOString().split("T")[0]);
+ for (let w = 0; w < weeksToRepeat; w++) {
+  for (const day of recurrence) {
+    const targetDayIndex = weekMap[day];
+    const newDate = new Date(baseDate);
+    newDate.setDate(baseDate.getDate() + (targetDayIndex - baseDate.getDay() + 7) % 7 + w * 7);
+
+    const newDateStr = newDate.toISOString().split("T")[0];
+    if (!plannedDates.includes(newDateStr)) {
+      plannedDates.push(newDateStr);
     }
   }
+}
+
 
   // 🧹 حذف كل الحجوزات القديمة + BookingMember المرتبط
   const oldBookings = await Booking.find({ groupId });
