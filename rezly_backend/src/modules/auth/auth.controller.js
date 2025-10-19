@@ -145,34 +145,53 @@ const decrypted = Buffer.concat([decipher.update(employee.image.data), decipher.
   }
 };
 
-
 export const getAllEmployees = async (req, res) => {
   try {
     const { id, role } = req.query;
-
-    // شرط البحث الأساسي
     const query = { active: true };
 
-    if (id) {
-      query._id = id; // لو حددنا ID نرجع الموظف المحدد فقط
-    }
+    if (id) query._id = id;
+    if (role) query.role = role;
 
-    if (role) {
-      query.role = role; // فلترة حسب الدور
-    }
-    console.log(query);
-   const employees = await Employee.find(query);
+    const employees = await Employee.find(query);
 
-    const totalCount = employees.length;
+    const key = Buffer.from(process.env.IMAGE_ENCRYPTION_KEY, "hex");
 
-    res.status(200).json({ totalCount, employees });
+    // نفك تشفير كل صورة
+    const employeesWithImages = employees.map(emp => {
+   let imageBase64 = null;
+if (emp.image && emp.image.data && emp.image.iv) {
+  try {
+    const iv = Buffer.from(emp.image.iv, "hex");
+    const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+    const decrypted = Buffer.concat([decipher.update(emp.image.data, "base64"), decipher.final()]);
+    imageBase64 = `data:${emp.image.mimetype};base64,${decrypted.toString("base64")}`;
+  } catch (err) {
+    console.warn(`Cannot decrypt image for employee ${emp._id}:`, err.message);
+    imageBase64 = null; // نتجنب الكراش
+  }
+}
+
+
+      return {
+        ...emp.toObject(),
+        image: imageBase64,
+      };
+    });
+
+    res.status(200).json({
+      totalCount: employees.length,
+      employees: employeesWithImages,
+    });
   } catch (error) {
     console.error("Error fetching employees:", error);
-    res
-      .status(500)
-      .json({ message: "فشل في جلب بيانات الموظفين", error: error.message });
+    res.status(500).json({
+      message: "فشل في جلب بيانات الموظفين",
+      error: error.message,
+    });
   }
 };
+
 export const updateRole = async (req, res) => {
   try {
     const { id,role } = req.params; // ID الموظف اللي بدنا نغير دوره
