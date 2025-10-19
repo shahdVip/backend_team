@@ -45,20 +45,20 @@ export const employeeSignUp = async (req, res) => {
     // ===== معالجة الصورة (تشفر وتخزن كـ Base64) =====
     let encryptedImage = "";
 
-    if (req.file) {
-      const key = Buffer.from(process.env.IMAGE_ENCRYPTION_KEY, "hex"); // لازم تكون 32 بايت (64 رمز hex)
-      const iv = crypto.randomBytes(16);
+if (req.file) {
+  const key = Buffer.from(process.env.IMAGE_ENCRYPTION_KEY, "hex"); // لازم 32 بايت
+  const iv = crypto.randomBytes(16);
 
-      const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
-      let encrypted = cipher.update(req.file.buffer);
-      encrypted = Buffer.concat([encrypted, cipher.final()]);
+  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+  const encrypted = Buffer.concat([cipher.update(req.file.buffer), cipher.final()]);
 
-      encryptedImage = {
-        data: encrypted.toString("base64"),
-        iv: iv.toString("hex"),
-        mimetype: req.file.mimetype,
-      };
-    }
+  encryptedImage = {
+    data: encrypted, // ❌ هنا احذف toString("base64")
+    iv: iv.toString("hex"),
+    mimetype: req.file.mimetype,
+  };
+}
+
     const newEmployee = new Employee({
       firstName,lastName,birthDate,image: encryptedImage,
       nationalId, gender, phoneNumber,email,address,
@@ -113,6 +113,39 @@ export const employeeSignUp = async (req, res) => {
     });
   }
 };
+
+export const getEmployeeImage = async (req, res) => {
+  try {
+    // 1️⃣ استدعاء الموظف من MongoDB
+    const employee = await Employee.findById(req.params.id);
+    if (!employee || !employee.image || !employee.image.data) {
+      return res.status(404).json({ message: "Image not found" });
+    }
+
+
+
+const key = Buffer.from(process.env.IMAGE_ENCRYPTION_KEY, "hex");
+const iv = Buffer.from(employee.image.iv, "hex");
+
+// فك التشفير مباشرة من الـ Buffer المخزن
+const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+const decrypted = Buffer.concat([decipher.update(employee.image.data), decipher.final()]);
+
+
+    // 4️⃣ إرسال الصورة مباشرة للفرونت
+    res.writeHead(200, {
+      "Content-Type": employee.image.mimetype,
+      "Content-Length": decrypted.length,
+    });
+    res.end(decrypted);
+    
+  } catch (error) {
+    console.error("Error decrypting image:", error);
+    res.status(500).json({ message: "Error decrypting image", error: error.message });
+  }
+};
+
+
 export const getAllEmployees = async (req, res) => {
   try {
     const { id, role } = req.query;

@@ -33,8 +33,10 @@ router.post(
   "/employeeSignUp",
   upload.single("image"), // حقل الصورة
 validation(schema.employeeSchema, { allowUnknown: true }),
+auth([roles.Admin]),
   asyncHandler(authController.employeeSignUp)
 );
+router.get('/getimage/:id', authController.getEmployeeImage);
 router.get('/getAllEmployees',auth([roles.Admin]),
 asyncHandler(authController.getAllEmployees));
 router.put(
