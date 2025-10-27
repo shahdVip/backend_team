@@ -1,6 +1,5 @@
 import Joi from "joi";
 
-
 export const generalFeilds = {
   email: Joi.string().email().required().messages({
     "string.email": "Email must be in this form: youremail@gmail.com",
@@ -24,17 +23,25 @@ export const generalFeilds = {
     }),
 };
 
-
 const validation = (schema) => {
   return (req, res, next) => {
     let filterData = {};
 
- 
     if (req.file) {
       if (req.file.mimetype.startsWith("image/")) {
-        filterData = { image: req.file, ...req.body, ...req.params, ...req.query };
+        filterData = {
+          image: req.file,
+          ...req.body,
+          ...req.params,
+          ...req.query,
+        };
       } else if (req.file.mimetype.startsWith("video/")) {
-        filterData = { video: req.file, ...req.body, ...req.params, ...req.query };
+        filterData = {
+          video: req.file,
+          ...req.body,
+          ...req.params,
+          ...req.query,
+        };
       } else {
         filterData = { ...req.body, ...req.params, ...req.query };
       }
@@ -44,7 +51,6 @@ const validation = (schema) => {
       filterData = { ...req.body, ...req.params, ...req.query };
     }
 
-  
     const { error } = schema.validate(filterData, { abortEarly: false });
 
     if (error) {
@@ -63,9 +69,9 @@ const validation = (schema) => {
   };
 };
 
-
 export const validateBody = (schema) => (req, res, next) => {
   const { error } = schema.validate(req.body, { abortEarly: false });
+
   if (error) {
     return res.status(400).json({
       status: "error",
@@ -73,6 +79,7 @@ export const validateBody = (schema) => (req, res, next) => {
       errors: error.details.map((err) => err.message),
     });
   }
+
   next();
 };
 
