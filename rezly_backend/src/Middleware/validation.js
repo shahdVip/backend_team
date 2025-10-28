@@ -68,6 +68,20 @@ const validation = (schema) => {
     next();
   };
 };
+export const validateBookingUpdate = (schema) => (req, res, next) => {
+  const merged = { ...req.body, ...req.query }; // نجمعهم
+  const { error } = schema.validate(merged, { abortEarly: false });
+
+  if (error) {
+    return res.status(400).json({
+      status: "error",
+      message: "Validation error",
+      details: error.details.map((d) => d.message),
+    });
+  }
+
+  next();
+};
 
 export const validateBody = (schema) => (req, res, next) => {
   const { error } = schema.validate(req.body, { abortEarly: false });

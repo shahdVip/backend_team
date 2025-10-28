@@ -128,56 +128,80 @@ export const createBookingSchema = Joi.object({
   notes: Joi.string().optional(),
 });
 
-// تحويل الوقت عربي 12 ساعة إلى دقائق للمقارنة
-function timeToMinutes(timeStr) {
-  const match = timeStr.match(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/);
+// دالة تحويل الوقت لدقائق
+// دالة تحويل الوقت إلى دقائق للتحقق من الترتيب
+const timeToMinutes = (str) => {
+  if (!str) return null;
+  const match = /^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/.exec(str);
   if (!match) return null;
-  let hour = parseInt(match[1], 10);
-  const minute = parseInt(match[2], 10);
-  const period = match[3];
-  if (period === "م" && hour < 12) hour += 12;
-  if (period === "ص" && hour === 12) hour = 0;
-  return hour * 60 + minute;
-}
+  let [_, h, m, period] = match;
+  h = Number(h);
+  m = Number(m);
+  if (period === "م" && h !== 12) h += 12;
+  if (period === "ص" && h === 12) h = 0;
+  return h * 60 + m;
+};
 
 export const updateBookingSchema = Joi.object({
-  date: Joi.date().required().messages({
-    "any.required": "التاريخ مطلوب",
-    "date.base": "التاريخ غير صالح",
-  }),
+  // الخصائص المتعلقة بالجدول
+  scheduleId: Joi.string().optional(),
+  updateByDate: Joi.date().iso().optional(),
+  dayOfWeek: Joi.number().min(0).max(6).optional(),
+  updateAllSameDay: Joi.boolean().optional(),
   timeStart: Joi.string()
     .pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/)
-    .required()
-    .messages({
-      "string.pattern.base":
-        "تنسيق وقت البداية غير صالح، استخدم مثل: 10:00 ص أو 9:00 م",
-      "any.required": "وقت البداية مطلوب",
-    }),
+    .optional(),
   timeEnd: Joi.string()
     .pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/)
-    .required()
-    .messages({
-      "string.pattern.base":
-        "تنسيق وقت النهاية غير صالح، استخدم مثل: 10:00 ص أو 9:00 م",
-      "any.required": "وقت النهاية مطلوب",
-    }),
-  updateFuture: Joi.boolean().optional().messages({
-    "boolean.base": "updateFuture يجب أن يكون true أو false",
-  }),
+    .optional(),
+
+  // الخصائص العامة
+  service: Joi.string().optional(),
+  description: Joi.string().optional(),
+  coachId: Joi.string().optional(),
+  location: Joi.string().optional(),
+  maxMembers: Joi.number().optional(),
+  reminders: Joi.array().items(Joi.string()).optional(),
+  members: Joi.array().items(Joi.string()).optional(),
+  subscriptionDuration: Joi.string().optional(),
 }).custom((value, helpers) => {
-  const startMinutes = timeToMinutes(value.timeStart);
-  const endMinutes = timeToMinutes(value.timeEnd);
-
-  if (startMinutes === null || endMinutes === null)
-    return helpers.error("any.invalid", { message: "وقت غير صالح" });
-
-  if (endMinutes <= startMinutes)
+  // تحقق من الوقت فقط إذا تم تعديل timeStart أو timeEnd
+  if (
+    (value.timeStart && !value.timeEnd) ||
+    (!value.timeStart && value.timeEnd)
+  ) {
     return helpers.error("any.invalid", {
-      message: "وقت النهاية يجب أن يكون بعد وقت البداية",
+      message: "يجب تمرير كل من timeStart و timeEnd معًا",
     });
+  }
+  if (value.timeStart && value.timeEnd) {
+    const startMinutes = timeToMinutes(value.timeStart);
+    const endMinutes = timeToMinutes(value.timeEnd);
+    if (endMinutes <= startMinutes)
+      return helpers.error("any.invalid", {
+        message: "وقت النهاية يجب أن يكون بعد وقت البداية",
+      });
+  }
+
+  // تحقق من أن schedule-related fields موجودة فقط لو هناك تعديل على الوقت أو الأيام
+  if (
+    (value.timeStart ||
+      value.timeEnd ||
+      value.updateByDate ||
+      value.dayOfWeek ||
+      value.scheduleId) &&
+    !value.scheduleId &&
+    !value.updateByDate &&
+    value.dayOfWeek === undefined
+  ) {
+    return helpers.error("any.invalid", {
+      message:
+        "يجب تمرير scheduleId أو updateByDate أو dayOfWeek عند تعديل الوقت/اليوم",
+    });
+  }
 
   return value;
-}, "Time validation");
+}, "Time & schedule validation");
 
 // Validate MongoDB ObjectId
 export const validateObjectId = (paramName) => (req, res, next) => {

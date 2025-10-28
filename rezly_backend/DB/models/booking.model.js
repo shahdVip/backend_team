@@ -1,14 +1,11 @@
 import mongoose from "mongoose";
 
-const scheduleSchema = new mongoose.Schema(
-  {
-    dayOfWeek: { type: Number, required: true },
-    timeStart: { type: String, required: true },
-    timeEnd: { type: String, required: true },
-    date: { type: Date, required: true }, // <-- هنا أضفنا التاريخ الفعلي
-  },
-  { _id: false }
-);
+const scheduleSchema = new mongoose.Schema({
+  dayOfWeek: { type: Number, required: true },
+  timeStart: { type: String, required: true },
+  timeEnd: { type: String, required: true },
+  date: { type: Date, required: true }, // <-- هنا أضفنا التاريخ الفعلي
+});
 
 const bookingSchema = new mongoose.Schema({
   service: {

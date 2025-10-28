@@ -15,7 +15,10 @@ import {
   updateBookingSchema,
   validateObjectId,
 } from "./booking.validation.js";
-import { validateBody } from "../../Middleware/validation.js";
+import {
+  validateBody,
+  validateBookingUpdate,
+} from "../../Middleware/validation.js";
 import { asyncHandler } from "../../Utils/catchError.js";
 
 const router = express.Router();
@@ -60,7 +63,7 @@ router.get(
 router.put(
   "/:bookingId",
   auth([roles.Admin, roles.Coach]),
-  validateBody(updateBookingSchema),
+  validateBookingUpdate(updateBookingSchema),
   asyncHandler(updateBooking)
 );
 

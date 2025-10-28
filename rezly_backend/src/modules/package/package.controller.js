@@ -1,14 +1,23 @@
 import Package from "../../../DB/models/packages.model.js";
 import { arabicSlugify } from "../../Utils/ArabicSlug.js";
-import { applyOffers } from "../../serveces/applyOffer.js";
+import { applyOffers } from "../../services/applyOffer.js";
 import Offer from "../../../DB/models/offer.model.js";
 
 // ==================== CREATE PACKAGE ====================
 export const createPackage = async (req, res) => {
   try {
     const {
-      name,description,price_cents,currency,price_type,duration_value,
-      duration_unit,auto_renew,trial_days,active,startDate,
+      name,
+      description,
+      price_cents,
+      currency,
+      price_type,
+      duration_value,
+      duration_unit,
+      auto_renew,
+      trial_days,
+      active,
+      startDate,
     } = req.body;
 
     // حساب endDate تلقائي حسب duration
@@ -37,12 +46,22 @@ export const createPackage = async (req, res) => {
 
     // التحقق من عدم وجود باقة مطابقة تمامًا
     const existingPackage = await Package.findOne({
-      name,description,price_cents,currency,price_type,duration_value,duration_unit,
-      auto_renew,trial_days,active,
+      name,
+      description,
+      price_cents,
+      currency,
+      price_type,
+      duration_value,
+      duration_unit,
+      auto_renew,
+      trial_days,
+      active,
     });
 
     if (existingPackage) {
-      return res.status(400).json({ message: "Package with identical data already exists" });
+      return res
+        .status(400)
+        .json({ message: "Package with identical data already exists" });
     }
 
     // إنشاء الباقة الجديدة
@@ -79,29 +98,26 @@ export const listPackages = async (req, res) => {
     const { active } = req.query;
     let filter = {};
 
- 
     if (req.user && req.user.role === "Admin") {
       if (active === "true") filter.active = true;
       else if (active === "false") filter.active = false;
     } else {
-      filter.active = true; 
+      filter.active = true;
       if (active) {
         return res.status(403).json({
-          message: "Only admins can filter packages by active status"
+          message: "Only admins can filter packages by active status",
         });
       }
     }
 
-   
     const packages = await Package.find(filter).sort({ createdAt: -1 });
 
-  
     const result = [];
     for (const pkg of packages) {
       const pricing = await applyOffers(pkg);
       result.push({
         ...pkg.toObject(),
-        pricing 
+        pricing,
       });
     }
     res.status(200).json({
@@ -123,7 +139,9 @@ export const getPackageById = async (req, res) => {
     if (!pkg) return res.status(404).json({ message: "Package not found" });
 
     if (pkg.active === false && req.user?.role !== "Admin") {
-      return res.status(403).json({ message: "You are not authorized to view this package" });
+      return res
+        .status(403)
+        .json({ message: "You are not authorized to view this package" });
     }
 
     const pricing = await applyOffers(pkg);
@@ -140,11 +158,14 @@ export const updatePackage = async (req, res) => {
     const { id } = req.params;
     const updateData = { ...req.body };
 
-   
     const now = new Date();
-    if ((updateData.startDate && new Date(updateData.startDate) < now) ||
-        (updateData.endDate && new Date(updateData.endDate) < now)) {
-      return res.status(400).json({ message: "Start and end dates must be in the future" });
+    if (
+      (updateData.startDate && new Date(updateData.startDate) < now) ||
+      (updateData.endDate && new Date(updateData.endDate) < now)
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Start and end dates must be in the future" });
     }
 
     if (updateData.name) {
@@ -156,7 +177,8 @@ export const updatePackage = async (req, res) => {
       runValidators: true,
     });
 
-    if (!updatedPackage) return res.status(404).json({ message: "Package not found" });
+    if (!updatedPackage)
+      return res.status(404).json({ message: "Package not found" });
 
     res.status(200).json({ message: "success", package: updatedPackage });
   } catch (err) {
@@ -167,7 +189,6 @@ export const updatePackage = async (req, res) => {
   }
 };
 
-
 // ==================== DISABLE PACKAGE ====================
 export const disablePackage = async (req, res) => {
   try {
@@ -175,7 +196,8 @@ export const disablePackage = async (req, res) => {
     const pkg = await Package.findById(id);
     if (!pkg) return res.status(404).json({ message: "Package not found" });
 
-    if (!pkg.active) return res.status(400).json({ message: "Package is already disabled" });
+    if (!pkg.active)
+      return res.status(400).json({ message: "Package is already disabled" });
 
     pkg.active = false;
     await pkg.save();
@@ -193,7 +215,8 @@ export const enablePackage = async (req, res) => {
     const pkg = await Package.findById(id);
     if (!pkg) return res.status(404).json({ message: "Package not found" });
 
-    if (pkg.active) return res.status(400).json({ message: "Package is already active" });
+    if (pkg.active)
+      return res.status(400).json({ message: "Package is already active" });
 
     pkg.active = true;
     await pkg.save();
