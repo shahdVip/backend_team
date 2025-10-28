@@ -147,13 +147,8 @@ export const employeeUpdateSchema = Joi.object({
     .optional(),
   notes: Joi.string().optional(),
 }).unknown(true); // يسمح بأي حقل إضافي مثل id بدون مشكلة
-
 export const createMemberSchema = Joi.object({
-  userName: Joi.string().min(4).max(20).required().messages({
-    "string.empty": "اسم المستخدم مطلوب",
-    "string.min": "اسم المستخدم يجب أن يحتوي على 4 أحرف على الأقل",
-    "string.max": "اسم المستخدم يجب أن يحتوي على 20 حرف كحد أقصى",
-  }),
+  
   firstName: Joi.string().required().messages({
     "string.empty": "الاسم الأول مطلوب",
   }),
@@ -178,7 +173,6 @@ export const createMemberSchema = Joi.object({
   }),
   phone: generalFeilds.phone.optional(),
   email: generalFeilds.email,
-  password: generalFeilds.password,
   city: Joi.string().optional().allow(""),
   address: Joi.string().optional().allow(""),
   image: Joi.string().uri().optional().allow(""),

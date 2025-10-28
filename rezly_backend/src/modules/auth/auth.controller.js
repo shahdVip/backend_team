@@ -365,19 +365,18 @@ export const updateEmployee = async (req, res) => {
 };
 
 ///////////////////////////////Add new member///////////////////////////////////////////////////
-
 export const createMember = async (req, res, next) => {
   try {
     if (req.user?.role !== "Admin") {
       return next(new AppError("غير مصرح لك بإنشاء مشترك جديد", 403));
     }
     const {
-      userName, firstName, lastName, gender, idNumber, birthDate, phone,startDate,
-      email, password, city, address, image, packageId, paymentMethod, coachId,
+      firstName, lastName, gender, idNumber, birthDate, phone,startDate,
+      email, city, address, image, packageId, paymentMethod, coachId,
     } = req.body;
 
     // التأكد من عدم وجود المستخدم مسبقًا
-    const existingUser = await userModel.findOne({ $or: [{ email }, { userName }, { idNumber }] });
+    const existingUser = await userModel.findOne({ $or: [{ email }, { idNumber }] });
     if (existingUser) 
       return next(new AppError("المستخدم موجود مسبقًا بنفس البريد أو اسم المستخدم أو رقم الهوية", 409));
 
@@ -386,8 +385,6 @@ export const createMember = async (req, res, next) => {
     if (!selectedPackage) 
       return next(new AppError("الاشتراك المحدد غير موجود", 404));
 
-    // تشفير كلمة المرور
-    const hashedPassword = await bcrypt.hash(password, parseInt(process.env.SALTROUND));
 
     // إنشاء refresh token
     const refreshToken = jwt.sign({ id: new mongoose.Types.ObjectId() }, process.env.REFRESHTOKEN_SECRET, { expiresIn: "30d" });
@@ -410,7 +407,6 @@ export const createMember = async (req, res, next) => {
 
     // إنشاء العضو وحفظه
     const member = await userModel.create({
-      userName,
       firstName,
       lastName,
       gender,
@@ -418,7 +414,6 @@ export const createMember = async (req, res, next) => {
       birthDate,
       phone,
       email,
-      password: hashedPassword,
       address: `${city || ""} - ${address || ""}`,
       image,
       roleId: memberRole._id,
@@ -429,7 +424,7 @@ export const createMember = async (req, res, next) => {
       responsibleEmployee: req.user?._id,
       startDate: startDate ? new Date(startDate) : new Date(), //اذا ما دخل تاريخ يحسبه تاريخ اليوم الحالي ,
       endDate,
-      slug:`arabicSlugify(${firstName}-${lastName}-${userName})`,
+      slug:`arabicSlugify(${firstName}-${lastName})`,
       refreshToken,
     });
 
@@ -443,7 +438,7 @@ export const createMember = async (req, res, next) => {
 
     // إنشاء توكن تأكيد البريد
     const confirmToken = jwt.sign({ email }, process.env.CONFIRMEMAILTOKEN, { expiresIn: "1h" });
-    await sendEmail(email, "تأكيد الحساب في النظام", userName, confirmToken);
+    await sendEmail(email, "تأكيد الحساب في النظام", confirmToken);
 
     // ربط العضو بالمدرب (إن وجد)
     if (coachId) {
@@ -466,7 +461,6 @@ export const createMember = async (req, res, next) => {
     next(error);
   }
 };
-////////////////////UPDATE MEMBER ////////////////////////////////////
 /// سمحت بتعديل الايميل ورقم الهاتف مع اني مش حاسة انه منطقي 
 export const updateMember = async (req, res, next) => {
   try {
