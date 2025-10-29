@@ -150,7 +150,7 @@ const decrypted = Buffer.concat([decipher.update(employee.image.data), decipher.
 export const getAllEmployees = async (req, res) => {
   try {
     const { id, role } = req.query;
-    const query = { active: true, confirmedEmail: true }; // 🔹 أضفنا الشرط هون
+    const query = { active: true}; // 🔹 أضفنا الشرط هون
 
     if (id) query._id = id;
     if (role) query.role = role;

@@ -131,24 +131,22 @@ export const updateBookingSchema = Joi.object({
   // خصائص الجدول الفردية
   scheduleId: Joi.string().optional(),
   groupId: Joi.string().optional(),
-  schedules: Joi.array()
-    .items(
-      Joi.object({
-        dayOfWeek: Joi.number().min(0).max(6).required(),
-        date: Joi.date().iso().optional(), // بدل required
-        timeStart: Joi.string().pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/).required(),
-        timeEnd: Joi.string().pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/).required(),
-        coach: Joi.string().optional(),
-        location: Joi.string().optional(),
-        members: Joi.array().items(Joi.string()).optional(),
-        reminders: Joi.array().items(Joi.string()).optional(),
-        maxMembers: Joi.number().optional(),
-        groupId: Joi.string().optional(),
-        _id: Joi.string().optional(),
-      })
-    )
-    .optional(),
-
+schedules: Joi.array()
+  .items(
+    Joi.object({
+      _id: Joi.string().required(),
+      dayOfWeek: Joi.number().min(0).max(6).optional(),
+      date: Joi.date().iso().optional(),
+      timeStart: Joi.string().pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/).optional(),
+      timeEnd: Joi.string().pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/).optional(),
+      coach: Joi.string().optional(),
+      location: Joi.string().optional(),
+      members: Joi.array().items(Joi.string()).optional(),
+      reminders: Joi.array().items(Joi.string()).optional(),
+      maxMembers: Joi.number().optional(),
+    })
+  )
+  .optional(),
 
   service: Joi.string().optional(),
   description: Joi.string().optional(),
