@@ -107,10 +107,12 @@ if (req.file) {
       return res.status(400).json({ errors: [message] });
     }
 
-    res.status(500).json({
-      message: "حدث خطأ أثناء إنشاء الحساب",
-      error,
-    });
+  console.log("❌ Error while creating account:", error);
+
+res.status(500).json({
+  message: "حدث خطأ أثناء إنشاء الحساب",
+});
+
   }
 };
 
@@ -148,7 +150,7 @@ const decrypted = Buffer.concat([decipher.update(employee.image.data), decipher.
 export const getAllEmployees = async (req, res) => {
   try {
     const { id, role } = req.query;
-    const query = { active: true };
+    const query = { active: true, confirmedEmail: true }; // 🔹 أضفنا الشرط هون
 
     if (id) query._id = id;
     if (role) query.role = role;
@@ -158,20 +160,23 @@ export const getAllEmployees = async (req, res) => {
     const key = Buffer.from(process.env.IMAGE_ENCRYPTION_KEY, "hex");
 
     // نفك تشفير كل صورة
-    const employeesWithImages = employees.map(emp => {
-   let imageBase64 = null;
-if (emp.image && emp.image.data && emp.image.iv) {
-  try {
-    const iv = Buffer.from(emp.image.iv, "hex");
-    const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
-    const decrypted = Buffer.concat([decipher.update(emp.image.data, "base64"), decipher.final()]);
-    imageBase64 = `data:${emp.image.mimetype};base64,${decrypted.toString("base64")}`;
-  } catch (err) {
-    console.warn(`Cannot decrypt image for employee ${emp._id}:`, err.message);
-    imageBase64 = null; // نتجنب الكراش
-  }
-}
+    const employeesWithImages = employees.map((emp) => {
+      let imageBase64 = null;
 
+      if (emp.image && emp.image.data && emp.image.iv) {
+        try {
+          const iv = Buffer.from(emp.image.iv, "hex");
+          const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+          const decrypted = Buffer.concat([
+            decipher.update(emp.image.data, "base64"),
+            decipher.final(),
+          ]);
+          imageBase64 = `data:${emp.image.mimetype};base64,${decrypted.toString("base64")}`;
+        } catch (err) {
+          console.warn(`Cannot decrypt image for employee ${emp._id}:`, err.message);
+          imageBase64 = null; // نتجنب الكراش
+        }
+      }
 
       return {
         ...emp.toObject(),
@@ -191,6 +196,7 @@ if (emp.image && emp.image.data && emp.image.iv) {
     });
   }
 };
+
 
 export const updateRole = async (req, res) => {
   try {
@@ -456,6 +462,7 @@ export const createMember = async (req, res, next) => {
 
   } catch (error) {
     next(error);
+    console.log(error);
   }
 };
 /// سمحت بتعديل الايميل ورقم الهاتف مع اني مش حاسة انه منطقي 

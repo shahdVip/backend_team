@@ -76,9 +76,14 @@ export const employeeSchema = Joi.object({
   }),
   image: Joi.any().optional().strip(),
 
-  nationalId: Joi.string().required().messages({
+ nationalId: Joi.string()
+  .pattern(/^\d{9}$/)
+  .required()
+  .messages({
     "any.required": "رقم الهوية مطلوب",
+    "string.pattern.base": "رقم الهوية يجب أن يحتوي على 9 أرقام",
   }),
+
   gender: Joi.string().valid("ذكر", "أنثى").required().messages({
     "any.only": "اختر جنس صحيح",
   }),
