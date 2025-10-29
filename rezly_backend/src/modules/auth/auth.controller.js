@@ -364,7 +364,6 @@ export const updateEmployee = async (req, res) => {
   }
 };
 
-///////////////////////////////Add new member///////////////////////////////////////////////////
 export const createMember = async (req, res, next) => {
   try {
     if (req.user?.role !== "Admin") {
@@ -375,7 +374,6 @@ export const createMember = async (req, res, next) => {
       email, city, address, image, packageId, paymentMethod, coachId,
     } = req.body;
 
-    // التأكد من عدم وجود المستخدم مسبقًا
     const existingUser = await userModel.findOne({ $or: [{ email }, { idNumber }] });
     if (existingUser) 
       return next(new AppError("المستخدم موجود مسبقًا بنفس البريد أو اسم المستخدم أو رقم الهوية", 409));
