@@ -257,172 +257,156 @@ expandedSchedules.push({
   }
 };
 
-// --- UPDATE BOOKING ---
+// --- UPDATE BOOKING GROUP ---
 export const updateBooking = async (req, res) => {
   try {
-    const bookingId = req.params.bookingId;
+    const { groupId } = req.params;
+    const updateAllSameGroup = req.query.updateAllSameGroup === "true";
+
+    if (!groupId) return res.status(400).json({ status: "error", message: "groupId is required" });
+
     const {
-      scheduleId,
-      groupId,
-      updateAllSameGroup, // ?updateAllSameGroup=true لتعديل كل الجداول بنفس الـgroupId
-      schedules: incomingSchedules,
-      date,
-      timeStart,
-      timeEnd,
-      location,
-      coach: coachFromBody,
-      members,
-      reminders,
-      maxMembers,
       service,
       description,
-      startDate: newStartDate,
-      subscriptionDuration,
-      ...rest
+      coachId,
+      location,
+      schedules, // [{dayOfWeek, timeStart, timeEnd}]
+      reminders = [],
+      maxMembers,
+      members = [],
+      subscriptionDuration = "1week",
+      startDate,
     } = req.body;
 
-    // جلب الحجز
-    const booking = await Booking.findById(bookingId);
-    if (!booking)
-      return res.status(404).json({ status: "error", message: "Booking not found" });
+    if (!startDate) return res.status(400).json({ status: "error", message: "startDate is required" });
+
+    // جلب الحجز حسب groupId
+    const booking = await Booking.findOne({ groupId });
+    if (!booking) return res.status(404).json({ status: "error", message: "Booking group not found" });
 
     // تحديد الكوتش
-    let finalCoachId = coachFromBody ?? booking.coach;
-    if (req.user?.role === "Coach") finalCoachId = req.user._id;
+    let finalCoachId = coachId ?? booking.coachId;
+    if (req.user.role === "Coach") finalCoachId = req.user._id;
 
-    const keyFields = { service, description, startDate: newStartDate, subscriptionDuration, ...rest };
-    Object.keys(keyFields).forEach(k => {
-      if (keyFields[k] !== undefined) booking[k] = keyFields[k];
-    });
+    const subscriptionMap = {
+      "1day": 1,
+      "1week": 7,
+      "2weeks": 14,
+      "3weeks": 21,
+      "1month": 30,
+      "3months": 90,
+      "6months": 180,
+      "1year": 365,
+    };
+    const totalDays = subscriptionMap[subscriptionDuration] || 7;
 
-    const convertArabicTo24 = (timeStr) => {
+    // حذف الجداول المستقبلية فقط
+    const today = new Date();
+    booking.schedules = booking.schedules.filter(s => new Date(s.date) < today);
+
+    const expandedSchedules = [];
+    const conflictedDays = [];
+    const bookingGroupId = booking.groupId;
+
+    const convertArabicTimeTo24Hour = (timeStr) => {
       if (!timeStr) return null;
       const [t, meridiem] = timeStr.split(" ");
       if (!t || !meridiem) return null;
       let [h, m] = t.split(":").map(Number);
       if (meridiem === "م" && h !== 12) h += 12;
       if (meridiem === "ص" && h === 12) h = 0;
-      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
     };
 
-    const makeDT = (dateObjOrStr, timeArabicStr) => {
-      const dateOnly = new Date(dateObjOrStr);
-      const tt = convertArabicTo24(timeArabicStr);
+    const makeDT = (dateObj, timeArabic) => {
+      const dateOnly = new Date(dateObj);
+      const tt = convertArabicTimeTo24Hour(timeArabic);
       if (!tt) return null;
       const [hh, mm] = tt.split(":").map(Number);
       dateOnly.setHours(hh, mm, 0, 0);
       return dateOnly;
     };
 
-    const conflictExists = async (fieldName, checkDateStr, startArabic, endArabic, value) => {
-      const [y, m, d] = checkDateStr.split("-");
-      const startDT = makeDT(new Date(`${y}-${m}-${d}`), startArabic);
-      const endDT = makeDT(new Date(`${y}-${m}-${d}`), endArabic);
-      if (!startDT || !endDT) return false;
+    // إنشاء الجداول الجديدة
+    const start = new Date(startDate);
+    for (let i = 0; i < totalDays; i++) {
+      const currentDate = new Date(start);
+      currentDate.setDate(start.getDate() + i);
+      const dayOfWeek = currentDate.getDay();
 
-      const query = {
-        "schedules.date": {
-          $gte: new Date(`${checkDateStr}T00:00:00.000Z`),
-          $lte: new Date(`${checkDateStr}T23:59:59.999Z`)
-        },
-        _id: { $ne: bookingId }
-      };
+      const daySchedule = schedules.find(s => s.dayOfWeek === dayOfWeek);
+      if (!daySchedule) continue;
 
-      if (fieldName === "coach") query["schedules.coach"] = value;
-      else if (fieldName === "location") query["schedules.location"] = value;
+      const dateString = currentDate.toISOString().split("T")[0];
+      const startDT = makeDT(currentDate, daySchedule.timeStart);
+      const endDT = makeDT(currentDate, daySchedule.timeEnd);
 
-      const items = await Booking.find(query).lean();
-      for (const it of items) {
-        for (const s of it.schedules || []) {
-          const sDateStr = new Date(s.date).toISOString().split("T")[0];
-          if (sDateStr !== checkDateStr) continue;
-          const sStart = makeDT(s.date, s.timeStart);
-          const sEnd = makeDT(s.date, s.timeEnd);
-          if (startDT < sEnd && endDT > sStart) return true;
-        }
-      }
-      return false;
-    };
+      // تحقق من التعارضات للكوتش
+      const conflictCoach = booking.schedules.some(s => 
+        s.coach.toString() === finalCoachId.toString() &&
+        startDT < makeDT(s.date, s.timeEnd) &&
+        endDT > makeDT(s.date, s.timeStart)
+      );
 
-    const buildSchedule = (template, dateObj) => {
-      return {
-        _id: template._id ?? new mongoose.Types.ObjectId(),
-        groupId: template.groupId ?? new mongoose.Types.ObjectId(),
-        date: dateObj,
-        dayOfWeek: new Date(dateObj).getDay(),
-        timeStart: template.timeStart,
-        timeEnd: template.timeEnd,
-        coach: template.coach ?? finalCoachId,
-        location: template.location ?? booking.location ?? location ?? "",
-        members: template.members ?? members ?? [],
-        reminders: template.reminders ?? reminders ?? [],
-        maxMembers: template.maxMembers ?? maxMembers ?? 1
-      };
-    };
+      // تحقق من التعارضات للموقع
+      const conflictRoom = booking.schedules.some(s =>
+        s.location === location &&
+        startDT < makeDT(s.date, s.timeEnd) &&
+        endDT > makeDT(s.date, s.timeStart)
+      );
 
-    // =============== تعديل كل الجداول بنفس groupId ===============
-    if (updateAllSameGroup === "true" && groupId) {
-      // نحذف كل الجداول القديمة بهذا groupId
-      booking.schedules = booking.schedules.filter(s => s.groupId?.toString() !== groupId);
-
-      const newCreated = [];
-      for (const template of incomingSchedules || []) {
-        const newSch = buildSchedule({ ...template, groupId }, template.date);
-        newCreated.push(newSch);
+      if (conflictCoach || conflictRoom) {
+        conflictedDays.push({
+          date: dateString,
+          reason: conflictCoach ? "Coach busy" : "Room busy",
+        });
+        continue;
       }
 
-      if (newCreated.length === 0) {
-        return res.status(400).json({ status: "error", message: "No valid schedules provided" });
-      }
-
-      booking.schedules.push(...newCreated);
-      await booking.save();
-
-      return res.status(200).json({
-        status: "success",
-        message: "All schedules with same groupId replaced successfully",
-        newCreated,
-        data: booking
+      expandedSchedules.push({
+        _id: new mongoose.Types.ObjectId(),
+        dayOfWeek,
+        timeStart: daySchedule.timeStart,
+        timeEnd: daySchedule.timeEnd,
+        date: currentDate,
+        coach: finalCoachId,
+        location,
+        reminders,
+        members,
+        maxMembers,
+        groupId: bookingGroupId,
       });
     }
 
-    // =============== تعديل schedule واحد داخل group ===============
-    if (scheduleId && groupId) {
-      let updated = false;
-      booking.schedules = booking.schedules.map(s => {
-        if (s._id.toString() === scheduleId && s.groupId?.toString() === groupId) {
-          if (timeStart) s.timeStart = timeStart;
-          if (timeEnd) s.timeEnd = timeEnd;
-          if (location) s.location = location;
-          if (coachFromBody) s.coach = coachFromBody;
-          if (Array.isArray(members)) s.members = members;
-          if (Array.isArray(reminders)) s.reminders = reminders;
-          if (maxMembers) s.maxMembers = maxMembers;
-          updated = true;
-        }
-        return s;
-      });
-
-      if (!updated)
-        return res.status(404).json({ status: "error", message: "Schedule not found in group" });
-
-      await booking.save();
-      return res.status(200).json({
-        status: "success",
-        message: "Schedule updated successfully within group",
-        data: booking
+    if (expandedSchedules.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "No new schedules created due to conflicts",
+        conflictedDays
       });
     }
 
-    // لو ما في أي من الحالات
-    return res.status(400).json({
-      status: "error",
-      message: "No valid update condition provided (need groupId or scheduleId)"
+    booking.schedules.push(...expandedSchedules);
+
+    // تحديث بيانات عامة للحجز
+    booking.service = service ?? booking.service;
+    booking.description = description ?? booking.description;
+    booking.startDate = new Date(startDate);
+    booking.subscriptionDuration = subscriptionDuration ?? booking.subscriptionDuration;
+    booking.maxMembers = maxMembers ?? booking.maxMembers;
+
+    await booking.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Booking group updated successfully",
+      data: booking,
+      conflictedDays
     });
 
   } catch (err) {
-    console.error("Update booking error:", err);
-    return res.status(500).json({ status: "error", message: err.message });
+    console.error("Update booking group error:", err);
+    res.status(500).json({ status: "error", message: err.message });
   }
 };
 

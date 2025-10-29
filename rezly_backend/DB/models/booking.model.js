@@ -11,7 +11,6 @@ const scheduleSchema = new mongoose.Schema({
   reminders: [{ type: String }],
   members: [{ type: mongoose.Schema.Types.ObjectId, ref: "Member" }],
   maxMembers: { type: Number, default: 1 },
-  groupId: { type: String, required: true },
 });
 
 

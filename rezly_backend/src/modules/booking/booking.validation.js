@@ -128,27 +128,40 @@ const timeToMinutes = (str) => {
 };
 
 export const updateBookingSchema = Joi.object({
-  // الخصائص المتعلقة بالجدول
+  // خصائص الجدول الفردية
   scheduleId: Joi.string().optional(),
-  updateByDate: Joi.date().iso().optional(),
-  dayOfWeek: Joi.number().min(0).max(6).optional(),
-  updateAllSameDay: Joi.boolean().optional(),
-  timeStart: Joi.string()
-    .pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/)
-    .optional(),
-  timeEnd: Joi.string()
-    .pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/)
+  groupId: Joi.string().optional(),
+  schedules: Joi.array()
+    .items(
+      Joi.object({
+        dayOfWeek: Joi.number().min(0).max(6).required(),
+        date: Joi.date().iso().optional(), // بدل required
+        timeStart: Joi.string().pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/).required(),
+        timeEnd: Joi.string().pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/).required(),
+        coach: Joi.string().optional(),
+        location: Joi.string().optional(),
+        members: Joi.array().items(Joi.string()).optional(),
+        reminders: Joi.array().items(Joi.string()).optional(),
+        maxMembers: Joi.number().optional(),
+        groupId: Joi.string().optional(),
+        _id: Joi.string().optional(),
+      })
+    )
     .optional(),
 
-  // الخصائص العامة
+
   service: Joi.string().optional(),
   description: Joi.string().optional(),
+  startDate: Joi.date().iso().optional(),
+  subscriptionDuration: Joi.string().optional(),
   coachId: Joi.string().optional(),
   location: Joi.string().optional(),
   maxMembers: Joi.number().optional(),
   reminders: Joi.array().items(Joi.string()).optional(),
   members: Joi.array().items(Joi.string()).optional(),
-  subscriptionDuration: Joi.string().optional(),
+
+  // flags
+  updateAllSameGroup: Joi.boolean().optional(),
 }).custom((value, helpers) => {
   // تحقق من الوقت فقط إذا تم تعديل timeStart أو timeEnd
   if (
@@ -166,23 +179,6 @@ export const updateBookingSchema = Joi.object({
       return helpers.error("any.invalid", {
         message: "وقت النهاية يجب أن يكون بعد وقت البداية",
       });
-  }
-
-  // تحقق من أن schedule-related fields موجودة فقط لو هناك تعديل على الوقت أو الأيام
-  if (
-    (value.timeStart ||
-      value.timeEnd ||
-      value.updateByDate ||
-      value.dayOfWeek ||
-      value.scheduleId) &&
-    !value.scheduleId &&
-    !value.updateByDate &&
-    value.dayOfWeek === undefined
-  ) {
-    return helpers.error("any.invalid", {
-      message:
-        "يجب تمرير scheduleId أو updateByDate أو dayOfWeek عند تعديل الوقت/اليوم",
-    });
   }
 
   return value;
