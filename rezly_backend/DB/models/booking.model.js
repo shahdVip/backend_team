@@ -6,55 +6,25 @@ const scheduleSchema = new mongoose.Schema({
   timeStart: { type: String, required: true },
   timeEnd: { type: String, required: true },
   date: { type: Date, required: true },
+  coach: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", required: true },
+  location: { type: String, required: true },
+  reminders: [{ type: String }],
+  members: [{ type: mongoose.Schema.Types.ObjectId, ref: "Member" }],
+  maxMembers: { type: Number, default: 1 },
+  groupId: { type: String, required: true },
 });
 
 
 const bookingSchema = new mongoose.Schema({
-  service: {
-    type: String,
-    required: true,
-  },
-  description: {
-    type: String,
-  },
-  coach: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Employee",
-    required: true,
-  },
-
-  location: {
-    type: String,
-    required: true,
-  },
-  schedules: [scheduleSchema], // Array of schedules
-  startDate: { type: Date, required: true }, // إضافة startDate
-
-  status: {
-    type: String,
-    enum: ["pending", "confirmed", "cancelled"],
-    default: "pending",
-  },
-
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Employee",
-    required: false,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  maxMembers: {
-    type: Number,
-    default: 1,
-  },
-  reminders: [{ type: String }],
+  service: { type: String, required: true },
+  description: { type: String },
+  schedules: [scheduleSchema], // كل schedule مستقل
+  startDate: { type: Date, required: true },
+  status: { type: String, enum: ["pending", "confirmed", "cancelled"], default: "pending" },
   subscriptionDuration: { type: String },
-  groupId: {
-    type: String,
-    index: true, // لتحسين البحث
-  },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Employee" },
+  createdAt: { type: Date, default: Date.now },
+  groupId: { type: mongoose.Schema.Types.ObjectId, index: true }, // groupId للحجز كامل
 });
 
 const Booking = mongoose.model("Booking", bookingSchema);

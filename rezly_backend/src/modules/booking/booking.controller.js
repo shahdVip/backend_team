@@ -93,7 +93,7 @@ function convertArabicTimeTo24Hour(timeStr) {
 }
 
 
-// --- CREATE BOOKING ---
+// --- CREATE BOOKING (Enhanced) ---
 export const createBooking = async (req, res) => {
   try {
     const {
@@ -137,6 +137,7 @@ export const createBooking = async (req, res) => {
     const start = new Date(startDate);
     const expandedSchedules = [];
     const conflictedDays = [];
+    const bookingGroupId = new mongoose.Types.ObjectId(); // Group ID للحجز كله
 
     for (let i = 0; i < totalDays; i++) {
       const currentDate = new Date(start);
@@ -155,11 +156,10 @@ export const createBooking = async (req, res) => {
 
       // تحقق من التعارضات (coach)
       const existingCoachBookings = await Booking.find({
-        coach: finalCoachId,
+        "schedules.coach": finalCoachId,
       }).lean();
 
       let conflictCoach = false;
-
       for (const b of existingCoachBookings) {
         for (const s of b.schedules) {
           const sStart = new Date(
@@ -172,7 +172,6 @@ export const createBooking = async (req, res) => {
               s.timeEnd
             )}`
           );
-
           if (startDateTime < sEnd && endDateTime > sStart) {
             conflictCoach = true;
             break;
@@ -183,7 +182,7 @@ export const createBooking = async (req, res) => {
 
       // تحقق من تعارض الغرفة
       const existingRoomBookings = await Booking.find({
-        location,
+        "schedules.location": location,
         "schedules.date": { $gte: startDateTime, $lte: endDateTime },
       }).lean();
 
@@ -210,13 +209,19 @@ export const createBooking = async (req, res) => {
         });
         continue;
       }
+expandedSchedules.push({
+  dayOfWeek,
+  timeStart: daySchedule.timeStart,
+  timeEnd: daySchedule.timeEnd,
+  date: currentDate,
+  coach: finalCoachId,
+  location,
+  reminders: daySchedule.reminders || [], // <-- هنا
+  members: daySchedule.members || [],     // <-- هنا
+  maxMembers,
+  groupId: new mongoose.Types.ObjectId().toString(),
+});
 
-      expandedSchedules.push({
-        dayOfWeek,
-        timeStart: daySchedule.timeStart,
-        timeEnd: daySchedule.timeEnd,
-        date: currentDate, // نحسب التاريخ بناءً على startDate وdayOfWeek
-      });
     }
 
     if (expandedSchedules.length === 0) {
@@ -230,29 +235,12 @@ export const createBooking = async (req, res) => {
     const booking = await Booking.create({
       service,
       description,
-      coach: finalCoachId,
-      location,
       startDate: new Date(startDate),
-      schedules: expandedSchedules.map((s) => ({
-        dayOfWeek: s.dayOfWeek,
-        timeStart: s.timeStart,
-        timeEnd: s.timeEnd,
-        date: s.date,
-      })),
       maxMembers,
-      reminders,
       subscriptionDuration,
-      groupId: new mongoose.Types.ObjectId(),
+      schedules: expandedSchedules,
+      groupId: bookingGroupId,
     });
-
-    if (members.length > 0) {
-      const bookingMembers = members.map((memberId) => ({
-        booking: booking._id,
-        member: memberId,
-        joinedAt: new Date(),
-      }));
-      await BookingMember.insertMany(bookingMembers);
-    }
 
     res.status(201).json({
       status: "success",

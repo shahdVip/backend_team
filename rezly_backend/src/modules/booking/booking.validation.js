@@ -17,20 +17,10 @@ const convertArabicTimeTo24Hour = (timeStr) => {
 };
 
 export const scheduleSchema = Joi.object({
-  dayOfWeek: Joi.number().integer().min(0).max(6).required().messages({
-    "number.base": "اليوم يجب أن يكون رقمًا بين 0 و6",
-    "any.required": "يجب تحديد اليوم (dayOfWeek)",
-  }),
-
+  dayOfWeek: Joi.number().integer().min(0).max(6).required(),
   timeStart: Joi.string()
     .pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/)
-    .required()
-    .messages({
-      "string.pattern.base":
-        "تنسيق الوقت غير صالح، استخدم مثل: 10:00 ص أو 9:00 م",
-      "any.required": "وقت البداية مطلوب",
-    }),
-
+    .required(),
   timeEnd: Joi.string()
     .pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/)
     .required()
@@ -38,21 +28,16 @@ export const scheduleSchema = Joi.object({
       const { timeStart } = helpers.state.ancestors[0];
       const startMinutes = convertArabicTimeTo24Hour(timeStart);
       const endMinutes = convertArabicTimeTo24Hour(value);
-
       if (startMinutes === null || endMinutes === null)
         return helpers.error("string.pattern.base");
-
       if (endMinutes <= startMinutes)
         return helpers.message("وقت النهاية يجب أن يكون بعد وقت البداية");
-
       return value;
-    })
-    .messages({
-      "string.pattern.base":
-        "تنسيق الوقت غير صالح، استخدم مثل: 10:00 ص أو 9:00 م",
-      "any.required": "وقت النهاية مطلوب",
     }),
+  reminders: Joi.array().items(Joi.string()).optional(),
+  members: Joi.array().items(Joi.string().length(24)).optional(),
 });
+
 
 // Create booking validation schema
 export const createBookingSchema = Joi.object({
