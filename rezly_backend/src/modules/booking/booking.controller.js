@@ -216,8 +216,8 @@ expandedSchedules.push({
   date: currentDate,
   coach: finalCoachId,
   location,
-  reminders: daySchedule.reminders || [], // <-- هنا
-  members: daySchedule.members || [],     // <-- هنا
+  reminders: reminders || [], // <-- هنا
+  members: members || [],     // <-- هنا
   maxMembers,
   groupId: new mongoose.Types.ObjectId().toString(),
 });
