@@ -258,179 +258,356 @@ expandedSchedules.push({
 };
 
 // --- UPDATE BOOKING ---
-export const updateBooking = async (req, res, next) => {
+// تحديث حجز — مرن وشامل (يدعم: scheduleId, updateAllSameDay, full-replace schedules)
+export const updateBooking = async (req, res) => {
   try {
     const bookingId = req.params.bookingId;
-    const { updateAllSameDay } = req.query;
+    const { updateAllSameDay } = req.query; // ?updateAllSameDay=true
     const {
       scheduleId,
       dayOfWeek,
       updateByDate,
+      // ممكن يمرر الفروونت schedules[] عندما يريد استبدال كل الجداول
+      schedules: incomingSchedules,
+      // خصائص يوم معين أو عامة
       date,
       timeStart,
       timeEnd,
+      location,
+      coach: coachFromBody,
+      members,
+      reminders,
+      maxMembers,
+      // خصائص عامة للحجز
+      service,
+      description,
+      startDate: newStartDate,
+      subscriptionDuration,
       ...rest
     } = req.body;
 
-    // 1️⃣ جلب الحجز
+    // جلب الحجز
     const booking = await Booking.findById(bookingId);
     if (!booking)
-      return res
-        .status(404)
-        .json({ status: "error", message: "Booking not found" });
+      return res.status(404).json({ status: "error", message: "Booking not found" });
 
-    // 2️⃣ تحديد الكوتش (لو المستخدم كوتش نفسه)
-    let finalCoachId = rest.coach || booking.coach;
-    if (req.user.role === "Coach") finalCoachId = req.user._id;
+    // تحديد الكوتش النهائي: لو المستخدم دور Coach استخدم حسابه
+    let finalCoachId = coachFromBody ?? booking.schedules?.[0]?.coach ?? booking.coach;
+    if (req.user?.role === "Coach") finalCoachId = req.user._id;
 
-    // 3️⃣ تعديل الخصائص العامة
-    Object.keys(rest).forEach((key) => {
-      if (rest[key] !== undefined) booking[key] = rest[key];
-    });
-
-    // 1️⃣ إذا لم يتم تمرير أي schedule-related field، عدل الخصائص العامة فقط
-    if (!scheduleId && !updateByDate && !dayOfWeek) {
-      await booking.save();
-      return res.status(200).json({
-        status: "success",
-        message: "Booking updated successfully (general properties only)",
-        data: booking,
-      });
-    }
-
-    // 4️⃣ تحديد الأيام المتأثرة (affectedSchedules)
-    let affectedSchedules = [];
-
-    if (updateAllSameDay === "true") {
-      if (dayOfWeek === undefined) {
-        return res.status(400).json({
-          status: "error",
-          message: "dayOfWeek is required for updateAllSameDay",
-        });
-      }
-
-      booking.schedules = booking.schedules.map((sch) => {
-        if (sch.dayOfWeek === dayOfWeek) {
-          const updated = {
-            ...sch.toObject(),
-            timeStart: timeStart ?? sch.timeStart,
-            timeEnd: timeEnd ?? sch.timeEnd,
-            date: date ? new Date(date) : sch.date,
-          };
-          affectedSchedules.push(updated);
-          return updated;
-        }
-        return sch;
-      });
-    } else if (updateByDate) {
-      // تعديل يوم حسب التاريخ
-      const targetDate = new Date(updateByDate).toISOString().split("T")[0];
-      booking.schedules = booking.schedules.map((sch) => {
-        const schDate = new Date(sch.date).toISOString().split("T")[0];
-        if (schDate === targetDate) {
-          const updated = {
-            ...sch.toObject(),
-            timeStart: timeStart ?? sch.timeStart,
-            timeEnd: timeEnd ?? sch.timeEnd,
-            date: date ? new Date(date) : sch.date,
-          };
-          affectedSchedules.push(updated);
-          return updated;
-        }
-        return sch;
-      });
-    } else if (scheduleId) {
-      // تعديل يوم حسب الـ scheduleId
-      booking.schedules = booking.schedules.map((sch) => {
-        if (sch._id.toString() === scheduleId) {
-          const updated = {
-            ...sch.toObject(),
-            timeStart: timeStart ?? sch.timeStart,
-            timeEnd: timeEnd ?? sch.timeEnd,
-            date: date ? new Date(date) : sch.date,
-          };
-          affectedSchedules.push(updated);
-          return updated;
-        }
-        return sch;
-      });
-    } else {
-      return res.status(400).json({
-        status: "error",
-        message:
-          "Must provide scheduleId or dayOfWeek (with updateAllSameDay=true) or updateByDate",
-      });
-    }
-
-    // 5️⃣ دالة تحويل الوقت العربي
-    const toHM = (timeStr) => {
-      if (!timeStr) return [0, 0];
+    // ======================
+    // دوال مساعدة
+    // ======================
+    // تحويل الوقت العربي "9:00 ص" -> "09:00"
+    const convertArabicTo24 = (timeStr) => {
+      if (!timeStr) return null;
       const [t, meridiem] = timeStr.split(" ");
+      if (!t || !meridiem) return null;
       let [h, m] = t.split(":").map(Number);
       if (meridiem === "م" && h !== 12) h += 12;
       if (meridiem === "ص" && h === 12) h = 0;
-      return [h, m];
-    };
-    const makeDT = (dateStr, h, m) => {
-      const d = new Date(dateStr);
-      d.setHours(h, m, 0, 0);
-      return d;
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
     };
 
-    // 6️⃣ التحقق من التعارض
-    const conflict = async (field, checkDate, startStr, endStr) => {
-      const [startH, startM] = toHM(startStr);
-      const [endH, endM] = toHM(endStr);
-      const firstStart = makeDT(checkDate, startH, startM);
-      const firstEnd = makeDT(checkDate, endH, endM);
+    // إنشاء Date من تاريخ (YYYY-MM-DD أو Date) ووقت (مثل "9:00 ص")
+    const makeDT = (dateObjOrStr, timeArabicStr) => {
+      const dateOnly = new Date(dateObjOrStr);
+      const tt = convertArabicTo24(timeArabicStr);
+      if (!tt) return null;
+      const [hh, mm] = tt.split(":").map(Number);
+      dateOnly.setHours(hh, mm, 0, 0);
+      return dateOnly;
+    };
 
-      const items = await Booking.find({
-        _id: { $ne: bookingId },
-        [field]: field === "coach" ? finalCoachId : booking.location,
-        "schedules.date": checkDate,
-      }).lean();
+    // فحص التعارضات: fieldValue إما coach id أو location string
+    // checkDateStr: "YYYY-MM-DD"  ، startArabic, endArabic  ، value = الذي نريد مقارنته (coach id أو location)
+    const conflictExists = async (fieldName, checkDateStr, startArabic, endArabic, value) => {
+      // نحسب start-end Date
+      const [y, m, d] = checkDateStr.split("-");
+      const startDT = makeDT(new Date(`${y}-${m}-${d}`), startArabic);
+      const endDT = makeDT(new Date(`${y}-${m}-${d}`), endArabic);
+      if (!startDT || !endDT) return false; // لو التنسيق غلط نتخطى
 
-      for (const item of items) {
-        for (const sch of item.schedules) {
-          const schDate = new Date(sch.date).toISOString().split("T")[0];
-          if (schDate !== new Date(checkDate).toISOString().split("T")[0])
-            continue;
+      // نبحث عن bookings أخرى تتضمن schedules في نفس التاريخ وفي نفس الحقل
+      // إذا fieldName === 'coach' فالقيمة تكون ObjectId، وإلا location string
+      const query = {
+        _id: { $ne: bookingId }, // نستثني الحجز الحالي
+        "schedules.date": {
+          $gte: new Date(`${checkDateStr}T00:00:00.000Z`),
+          $lte: new Date(`${checkDateStr}T23:59:59.999Z`)
+        }
+      };
+      // نفلتر بناءً على الحقل داخل schedules
+      if (fieldName === "coach") query["schedules.coach"] = value;
+      else if (fieldName === "location") query["schedules.location"] = value;
+      else return false;
 
-          const [sH, sM] = toHM(sch.timeStart);
-          const [eH, eM] = toHM(sch.timeEnd);
-          const s = makeDT(sch.date, sH, sM);
-          const e = makeDT(sch.date, eH, eM);
-          if (firstStart < e && firstEnd > s) return true;
+      const items = await Booking.find(query).lean();
+
+      for (const it of items) {
+        for (const s of it.schedules || []) {
+          const sDateStr = new Date(s.date).toISOString().split("T")[0];
+          if (sDateStr !== checkDateStr) continue;
+          const sStart = makeDT(s.date, s.timeStart);
+          const sEnd = makeDT(s.date, s.timeEnd);
+          if (!sStart || !sEnd) continue;
+          if (startDT < sEnd && endDT > sStart) return true;
         }
       }
       return false;
     };
 
+    // ======================
+    // تحديث الحقول العامة في الحجز (service, description, startDate, subscriptionDuration, ...)
+    // ======================
+    const generalFields = { service, description, startDate: newStartDate, subscriptionDuration, ...rest };
+    Object.keys(generalFields).forEach((k) => {
+      if (generalFields[k] !== undefined) booking[k] = generalFields[k];
+    });
+
+    // ======================
+    // Helper: build schedule object (من incoming template أو من الحقول المرسلة)
+    // - template قد يأتي من incomingSchedules element أو نستخدم الحقول الفردية timeStart/timeEnd/date/...
+    // - يجب التأكد من وجود coach & location (إما من template أو من booking أو من finalCoachId)
+    // ======================
+    const buildScheduleFromTemplate = (template, dateObj) => {
+      // template: { dayOfWeek, timeStart, timeEnd, reminders?, members?, coach?, location?, maxMembers? }
+      const sch = {};
+      sch.dayOfWeek = template.dayOfWeek ?? (new Date(dateObj)).getDay();
+      sch.timeStart = template.timeStart;
+      sch.timeEnd = template.timeEnd;
+      sch.date = dateObj;
+      sch.coach = template.coach ?? finalCoachId;
+      sch.location = template.location ?? booking.location ?? location ?? "";
+      sch.reminders = Array.isArray(template.reminders) ? template.reminders : (Array.isArray(reminders) ? reminders : []);
+      sch.members = Array.isArray(template.members) ? template.members : (Array.isArray(members) ? members : []);
+      sch.maxMembers = template.maxMembers ?? maxMembers ?? booking.maxMembers ?? 1;
+      sch.groupId = booking.groupId ?? new mongoose.Types.ObjectId();
+      sch._id = template._id ? template._id : new mongoose.Types.ObjectId();
+      return sch;
+    };
+
+    // ======================
+    // حالة 1: إذا المرسل incomingSchedules && المستخدم يريد استبدال الجداول (full-replace)
+    //   - نعتبر هذا استبدال كامل: نحسب التواريخ بناءً على booking.startDate (أو newStartDate إذا مرر)
+    //   - نطبق نفس منطق createBooking: نكرر عبر أيام subscriptionDuration ونبني expandedSchedules
+    //   - نحذف القديم (نستبدل booking.schedules = expanded)
+    // ======================
+    const affectedSchedules = []; // لنتابع السجلات المتأثرة لفحص الكونفليكت ثم للعودة بالـ response
+
+    if (Array.isArray(incomingSchedules) && incomingSchedules.length > 0 && !(scheduleId || updateAllSameDay || updateByDate)) {
+      // هذا استبدال كامل للجداول
+      // نحدد start و totalDays
+      const start = new Date( booking.startDate || newStartDate );
+      const subscriptionMap = {
+        "1day": 1, "1week": 7, "2weeks": 14, "3weeks": 21,
+        "1month": 30, "3months": 90, "6months": 180, "1year": 365
+      };
+      const totalDays = subscriptionMap[booking.subscriptionDuration ?? subscriptionDuration] || 7;
+      const newExpanded = [];
+      const conflictedDays = [];
+
+      for (let i = 0; i < totalDays; i++) {
+        const currentDate = new Date(start);
+        currentDate.setDate(start.getDate() + i);
+        const dow = currentDate.getDay();
+
+        const template = incomingSchedules.find(s => s.dayOfWeek === dow);
+        if (!template) continue;
+
+        // تجهيز start & end DateTime
+        const startDT = makeDT(currentDate, template.timeStart);
+        const endDT = makeDT(currentDate, template.timeEnd);
+        if (!startDT || !endDT) {
+          conflictedDays.push({ date: currentDate.toISOString().split("T")[0], reason: "Invalid time" });
+          continue;
+        }
+
+        // تحقق التعارض coach
+        const coachToCheck = template.coach ?? finalCoachId;
+        const conflictCoach = await conflictExists("coach", currentDate.toISOString().split("T")[0], template.timeStart, template.timeEnd, coachToCheck);
+        // تحقق التعارض location
+        const locToCheck = template.location ?? booking.location ?? location;
+        const conflictRoom = await conflictExists("location", currentDate.toISOString().split("T")[0], template.timeStart, template.timeEnd, locToCheck);
+
+        if (conflictCoach || conflictRoom) {
+          conflictedDays.push({ date: currentDate.toISOString().split("T")[0], reason: conflictCoach ? "Coach busy" : "Room busy" });
+          continue;
+        }
+
+        const sch = buildScheduleFromTemplate(template, currentDate);
+        newExpanded.push(sch);
+        affectedSchedules.push(sch);
+      }
+
+      if (newExpanded.length === 0) {
+        return res.status(400).json({ status: "error", message: "All selected days conflicted — no schedules updated", conflictedDays });
+      }
+
+      // استبدال الجداول القديمة بالجديدة — حذف الجداول القديمة المرتبطة بنفس groupId
+      // أسهل طريقة: استبدال كامل المصفوفة
+      booking.schedules = newExpanded;
+      await booking.save();
+
+      return res.status(200).json({
+        status: "success",
+        message: "Booking schedules replaced successfully",
+        data: booking,
+        affectedSchedules,
+        conflictedDays: conflictedDays || []
+      });
+    }
+
+    // ======================
+    // حالة 2: updateAllSameDay (استبدال/تعديل كل الجداول التي لها dayOfWeek محدد)
+    //   - إذا incomingSchedules contains template for that day, نستخدمه كـ template
+    //   - وإلا نستخدم القيم المرسلة timeStart/timeEnd/location/coach/reminders/members
+    //   - سلوكنا: نحذف الجداول القديمة التي تملك نفس dayOfWeek و نفس groupId، ونضيف الجداول الجديدة (أو نعدل الحقول)
+    // ======================
+    if (updateAllSameDay === "true") {
+      if (dayOfWeek === undefined) {
+        return res.status(400).json({ status: "error", message: "dayOfWeek is required for updateAllSameDay" });
+      }
+
+      // احصل على قالب للمرة الواحدة: إما من incomingSchedules أو من الحقول المرسلة
+      const template = (Array.isArray(incomingSchedules) && incomingSchedules.find(s => s.dayOfWeek === dayOfWeek))
+        || { dayOfWeek, timeStart, timeEnd, location, coach: coachFromBody, reminders, members, maxMembers };
+
+      // نحسب كل التواريخ الموجودة في booking.schedules التي لها نفس dayOfWeek & same groupId
+      const oldSchedulesToRemove = booking.schedules.filter(s => s.dayOfWeek === dayOfWeek && s.groupId?.toString() === (booking.groupId?.toString() || ""));
+      // نحذفها
+      booking.schedules = booking.schedules.filter(s => !(s.dayOfWeek === dayOfWeek && s.groupId?.toString() === (booking.groupId?.toString() || "")));
+
+      // نحتاج أن نعيد إنشاء جداول جديدة لنفس النطاق الزمني (نستخدم booking.startDate و subscriptionDuration)
+      const start = new Date( booking.startDate );
+      const subscriptionMap = {
+        "1day": 1, "1week": 7, "2weeks": 14, "3weeks": 21,
+        "1month": 30, "3months": 90, "6months": 180, "1year": 365
+      };
+      const totalDays = subscriptionMap[booking.subscriptionDuration] || 7;
+      const newCreated = [];
+      const conflicted = [];
+
+      for (let i = 0; i < totalDays; i++) {
+        const currentDate = new Date(start);
+        currentDate.setDate(start.getDate() + i);
+        if (currentDate.getDay() !== Number(dayOfWeek)) continue;
+
+        // استخدم template لبناء schedule
+        const schTemplate = template;
+        const startDT = makeDT(currentDate, schTemplate.timeStart);
+        const endDT = makeDT(currentDate, schTemplate.timeEnd);
+        if (!startDT || !endDT) {
+          conflicted.push({ date: currentDate.toISOString().split("T")[0], reason: "Invalid time" });
+          continue;
+        }
+
+        const coachToCheck = schTemplate.coach ?? finalCoachId;
+        const locToCheck = schTemplate.location ?? booking.location;
+
+        const conflictCoach = await conflictExists("coach", currentDate.toISOString().split("T")[0], schTemplate.timeStart, schTemplate.timeEnd, coachToCheck);
+        const conflictRoom = await conflictExists("location", currentDate.toISOString().split("T")[0], schTemplate.timeStart, schTemplate.timeEnd, locToCheck);
+
+        if (conflictCoach || conflictRoom) {
+          conflicted.push({ date: currentDate.toISOString().split("T")[0], reason: conflictCoach ? "Coach busy" : "Room busy" });
+          continue;
+        }
+
+        const newSch = buildScheduleFromTemplate(schTemplate, currentDate);
+        booking.schedules.push(newSch);
+        newCreated.push(newSch);
+        affectedSchedules.push(newSch);
+      }
+
+      await booking.save();
+      return res.status(200).json({
+        status: "success",
+        message: "Updated all schedules with same dayOfWeek",
+        added: newCreated,
+        removedCount: oldSchedulesToRemove.length,
+        conflictedDays: conflicted,
+        data: booking
+      });
+    }
+
+    // ======================
+    // حالة 3: updateByDate (تعديل الـ schedule الذي يملك نفس التاريخ)
+    // ======================
+    if (updateByDate) {
+      const targetDateStr = new Date(updateByDate).toISOString().split("T")[0];
+      booking.schedules = booking.schedules.map((sch) => {
+        const schDateStr = new Date(sch.date).toISOString().split("T")[0];
+        if (schDateStr === targetDateStr) {
+          // سنطبق newValues (التي حددناها) — احتياطي: استخدم القيم المفردة إذا مرّت
+          if (timeStart) sch.timeStart = timeStart;
+          if (timeEnd) sch.timeEnd = timeEnd;
+          if (location) sch.location = location;
+          if (coachFromBody) sch.coach = coachFromBody;
+          if (Array.isArray(reminders)) sch.reminders = reminders;
+          if (Array.isArray(members)) sch.members = members;
+          if (maxMembers) sch.maxMembers = maxMembers;
+          if (date) sch.date = new Date(date);
+          affectedSchedules.push(sch);
+        }
+        return sch;
+      });
+      // تحقق من التعارض قبل الحفظ (بعد التعديل) — سنفذ الفحص لاحقاً على affectedSchedules
+    }
+
+    // ======================
+    // حالة 4: scheduleId — تعديل schedule واحد فقط
+    // ======================
+    if (scheduleId) {
+      let found = false;
+      booking.schedules = booking.schedules.map((sch) => {
+        if (sch._id.toString() === scheduleId) {
+          found = true;
+          if (timeStart) sch.timeStart = timeStart;
+          if (timeEnd) sch.timeEnd = timeEnd;
+          if (location) sch.location = location;
+          if (coachFromBody) sch.coach = coachFromBody;
+          if (Array.isArray(reminders)) sch.reminders = reminders;
+          if (Array.isArray(members)) sch.members = members;
+          if (maxMembers) sch.maxMembers = maxMembers;
+          if (date) sch.date = new Date(date);
+          affectedSchedules.push(sch);
+        }
+        return sch;
+      });
+      if (!found) return res.status(404).json({ status: "error", message: "Schedule not found" });
+    }
+
+    // ======================
+    // الآن: لدينا affectedSchedules array — نفحص التعارضات لكل schedule قبل الحفظ النهائي
+    // ======================
     for (const sch of affectedSchedules) {
       const checkDate = new Date(sch.date).toISOString().split("T")[0];
-      if (await conflict("coach", checkDate, sch.timeStart, sch.timeEnd)) {
-        return res
-          .status(400)
-          .json({ status: "error", message: `Coach busy on ${checkDate}` });
+      // تحقق coach
+      if (sch.coach) {
+        const c = await conflictExists("coach", checkDate, sch.timeStart, sch.timeEnd, sch.coach);
+        if (c) return res.status(400).json({ status: "error", message: `Coach busy on ${checkDate}` });
       }
-      if (await conflict("location", checkDate, sch.timeStart, sch.timeEnd)) {
-        return res
-          .status(400)
-          .json({ status: "error", message: `Room busy on ${checkDate}` });
+      // تحقق location
+      if (sch.location) {
+        const r = await conflictExists("location", checkDate, sch.timeStart, sch.timeEnd, sch.location);
+        if (r) return res.status(400).json({ status: "error", message: `Room busy on ${checkDate}` });
       }
     }
 
-    // 7️⃣ حفظ التعديلات
+    // ======================
+    // أخيراً: نحفظ الحجز
+    // ======================
     await booking.save();
 
     return res.status(200).json({
       status: "success",
       message: "Booking updated successfully",
+      affectedSchedules,
       data: booking,
     });
   } catch (err) {
     console.error("Update booking error:", err);
-    res.status(500).json({ status: "error", message: err.message });
+    return res.status(500).json({ status: "error", message: err.message });
   }
 };
 
