@@ -245,7 +245,6 @@ export const deleteEmployee = async (req, res) => {
       return res.status(400).json({ message: "لم يتم إرسال رقم الموظف (id)" });
     }
 
-    // إذا أرسل id كـ string نحولها لمصفوفة عشان نوحد المعالجة
     if (!Array.isArray(id)) {
       id = [id];
     }

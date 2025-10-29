@@ -91,19 +91,7 @@ function convertArabicTimeTo24Hour(timeStr) {
   // صيغة 24 ساعة
   return `${hour.toString().padStart(2, "0")}:${minute}`;
 }
-function convertSubscriptionToDays(value) {
-  const map = {
-    "1day": 1,
-    "1week": 7,
-    "2weeks": 14,
-    "3weeks": 21,
-    "1month": 30,
-    "3months": 90,
-    "6months": 180,
-    "1year": 365,
-  };
-  return map[value] || 7; // الافتراضي: أسبوع
-}
+
 
 // --- CREATE BOOKING ---
 export const createBooking = async (req, res) => {

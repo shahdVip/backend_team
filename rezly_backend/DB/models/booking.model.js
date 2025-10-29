@@ -1,11 +1,13 @@
 import mongoose from "mongoose";
 
 const scheduleSchema = new mongoose.Schema({
+  _id: { type: mongoose.Schema.Types.ObjectId, default: () => new mongoose.Types.ObjectId() },
   dayOfWeek: { type: Number, required: true },
   timeStart: { type: String, required: true },
   timeEnd: { type: String, required: true },
-  date: { type: Date, required: true }, // <-- هنا أضفنا التاريخ الفعلي
+  date: { type: Date, required: true },
 });
+
 
 const bookingSchema = new mongoose.Schema({
   service: {
