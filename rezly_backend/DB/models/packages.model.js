@@ -40,6 +40,7 @@ const packageSchema = new Schema(
     duration_unit: {
       type: String,
       required: true,
+      enum: ["Days", "Weeks", "Months", "Years", "يوم", "أيام"],
     },
     auto_renew: {
       type: Boolean,

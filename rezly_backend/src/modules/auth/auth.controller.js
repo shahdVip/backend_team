@@ -459,6 +459,8 @@ export const createMemberprice = async (req, res, next) => {
     const unit = selectedPackage.duration_unit.toLowerCase();
     switch (unit) {
       case "days":
+      case "يوم":
+      case "أيام":
         endDate.setDate(endDate.getDate() + selectedPackage.duration_value);
         break;
       case "weeks":
