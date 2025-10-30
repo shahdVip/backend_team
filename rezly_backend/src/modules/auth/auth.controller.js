@@ -373,11 +373,24 @@ export const createMemberprice = async (req, res, next) => {
     if (req.user?.role !== "Admin") {
       return next(new AppError("غير مصرح لك بإنشاء مشترك جديد", 403));
     }
-
-    const {
-      firstName, lastName, gender, idNumber, birthDate, phone, startDate,
-      email, city, address, image, packageId, paymentMethod, coachId, fees // 👈 أضفنا الحقل الجديد (الرسوم)
-    } = req.body;
+const {
+  userName,
+  firstName,
+  lastName,
+  gender,
+  idNumber,
+  birthDate,
+  phone,
+  startDate,
+  email,
+  city,
+  address,
+  image,
+  packageId,
+  paymentMethod,
+  coachId,
+  password,
+} = req.body;
 
     const existingUser = await userModel.findOne({ $or: [{ email }, { idNumber }] });
     if (existingUser)
