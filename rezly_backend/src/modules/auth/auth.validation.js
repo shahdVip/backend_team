@@ -1,10 +1,7 @@
 import Joi from "joi";
 import { generalFeilds } from "../../Middleware/validation.js";
 export const signUpSchema = Joi.object({
-  userName: Joi.string().min(3).required().messages({
-    "string.empty": "Username is required",
-    "string.min": "Username must be at least 6 characters long",
-  }),
+
   email: generalFeilds.email,
   password: generalFeilds.password,
   cpassword: Joi.string().valid(Joi.ref("password")).required().messages({
