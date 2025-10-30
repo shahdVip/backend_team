@@ -26,7 +26,7 @@ export const createPackageSchema = Joi.object({
     'number.min': 'Duration value must be at least 1', 
     'any.required': 'Duration value is required',
   }),
-  duration_unit: Joi.string().valid('Days', 'Weeks', 'Months', 'Years').required().messages({
+  duration_unit: Joi.string().required().messages({
   'any.only': 'Duration unit must be one of Days, Weeks, Months, or Years',
   'any.required': 'Duration unit is required',
 }),

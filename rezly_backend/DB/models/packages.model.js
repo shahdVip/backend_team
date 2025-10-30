@@ -41,7 +41,6 @@ const packageSchema = new Schema(
     duration_unit: {
       type: String,
       required: true,
-      enum: ["Days", "Weeks", "Months", "Years"],
     },
     auto_renew: {
       type: Boolean,
