@@ -408,6 +408,7 @@ export const createMemberprice = async (req, res, next) => {
     if (req.user?.role !== "Admin") {
       return next(new AppError("غير مصرح لك بإنشاء مشترك جديد", 403));
     }
+
     const {
       userName,
       firstName,
@@ -428,6 +429,15 @@ export const createMemberprice = async (req, res, next) => {
       fees,
     } = req.body;
 
+    // ✅ التحقق من وجود اسم المستخدم وكلمة المرور
+    if (!userName && !firstName && !lastName) {
+      return next(new AppError("اسم المستخدم أو الاسم الكامل مطلوب", 400));
+    }
+
+    const finalUserName = userName || `user_${new mongoose.Types.ObjectId()}`;
+    if (!password) return next(new AppError("كلمة المرور مطلوبة", 400));
+
+    // التحقق من وجود مستخدم بنفس البريد أو رقم الهوية
     const existingUser = await userModel.findOne({
       $or: [{ email }, { idNumber }],
     });
@@ -441,9 +451,9 @@ export const createMemberprice = async (req, res, next) => {
     if (!selectedPackage)
       return next(new AppError("الاشتراك المحدد غير موجود", 404));
 
-    // ✅ تحديث سعر الباقة بما أدخله المستخدم
+    // تحديث سعر الباقة إذا أدخل المستخدم قيمة
     if (fees) {
-      selectedPackage.price_cents = Math.round(fees * 100); // نحول إلى سنتات (لو السعر بالدولار)
+      selectedPackage.price_cents = Math.round(fees * 100);
       await selectedPackage.save();
     }
 
@@ -488,8 +498,8 @@ export const createMemberprice = async (req, res, next) => {
 
     // إنشاء العضو
     const member = await userModel.create({
-      userName, // ✅ ضروري جداً
-      password, // ✅ ضروري أيضاً
+      userName: finalUserName,
+      password,
       firstName,
       lastName,
       gender,
@@ -507,7 +517,7 @@ export const createMemberprice = async (req, res, next) => {
       responsibleEmployee: req.user?._id,
       startDate: startDate ? new Date(startDate) : new Date(),
       endDate,
-      slug: arabicSlugify(`${firstName}-${lastName}`), // ✅ صححنا كمان هاي
+      slug: arabicSlugify(`${firstName}-${lastName}`),
       refreshToken,
     });
 
@@ -551,12 +561,12 @@ export const createMemberprice = async (req, res, next) => {
         price: selectedPackage.price_cents / 100,
         duration: `${selectedPackage.duration_value} ${selectedPackage.duration_unit}`,
         paymentMethod,
-        updatedPrice: fees ? fees : selectedPackage.price_cents / 100, // السعر المُدخل (إن وُجد)
+        updatedPrice: fees ? fees : selectedPackage.price_cents / 100,
       },
     });
   } catch (error) {
-    next(error);
     console.error(error);
+    next(error);
   }
 };
 

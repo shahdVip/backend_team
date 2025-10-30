@@ -2,8 +2,7 @@ import mongoose, { model, Schema } from "mongoose";
 
 const userSchema = new Schema(
   {
- 
-
+    userName: { type: String, trim: true },
     firstName: { type: String, trim: true },
     lastName: { type: String, trim: true },
 
@@ -139,11 +138,7 @@ const userSchema = new Schema(
     },
   },
 
-  { timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-   } 
-  
-)
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
+);
 const userModel = model("User", userSchema);
 export default userModel;

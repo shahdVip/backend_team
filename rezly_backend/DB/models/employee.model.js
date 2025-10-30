@@ -38,4 +38,4 @@ const employeeSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export const Employee = mongoose.model("employee", employeeSchema);
+export const Employee = mongoose.model("Employee", employeeSchema);
