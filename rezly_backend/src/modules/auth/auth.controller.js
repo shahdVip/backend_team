@@ -368,6 +368,117 @@ export const updateEmployee = async (req, res) => {
       .json({ message: "Error updating employee", error: error.message });
   }
 };
+export const createMemberprice = async (req, res, next) => {
+  try {
+    if (req.user?.role !== "Admin") {
+      return next(new AppError("غير مصرح لك بإنشاء مشترك جديد", 403));
+    }
+
+    const {
+      firstName, lastName, gender, idNumber, birthDate, phone, startDate,
+      email, city, address, image, packageId, paymentMethod, coachId, fees // 👈 أضفنا الحقل الجديد (الرسوم)
+    } = req.body;
+
+    const existingUser = await userModel.findOne({ $or: [{ email }, { idNumber }] });
+    if (existingUser)
+      return next(new AppError("المستخدم موجود مسبقًا بنفس البريد أو رقم الهوية", 409));
+
+    // التأكد من وجود الباقة
+    const selectedPackage = await Package.findById(packageId);
+    if (!selectedPackage)
+      return next(new AppError("الاشتراك المحدد غير موجود", 404));
+
+    // ✅ تحديث سعر الباقة بما أدخله المستخدم
+    if (fees) {
+      selectedPackage.price_cents = Math.round(fees * 100); // نحول إلى سنتات (لو السعر بالدولار)
+      await selectedPackage.save();
+    }
+
+    // إنشاء refresh token
+    const refreshToken = jwt.sign(
+      { id: new mongoose.Types.ObjectId() },
+      process.env.REFRESHTOKEN_SECRET,
+      { expiresIn: "30d" }
+    );
+
+    // حساب تاريخ انتهاء الاشتراك
+    let endDate = new Date();
+    const unit = selectedPackage.duration_unit.toLowerCase();
+    switch (unit) {
+      case "days": endDate.setDate(endDate.getDate() + selectedPackage.duration_value); break;
+      case "weeks": endDate.setDate(endDate.getDate() + selectedPackage.duration_value * 7); break;
+      case "months": endDate.setMonth(endDate.getMonth() + selectedPackage.duration_value); break;
+      case "years": endDate.setFullYear(endDate.getFullYear() + selectedPackage.duration_value); break;
+    }
+
+    // التأكد من وجود دور Member
+    let memberRole = await Role.findOne({ name: "Member" });
+    if (!memberRole) {
+      memberRole = await Role.create({
+        name: "Member",
+        description: "مشترك في النظام",
+        permissions: [],
+      });
+    }
+
+    // إنشاء العضو
+    const member = await userModel.create({
+      firstName,
+      lastName,
+      gender,
+      idNumber,
+      birthDate,
+      phone,
+      email,
+      address: `${city || ""} - ${address || ""}`,
+      image,
+      roleId: memberRole._id,
+      packageId,
+      coachId,
+      paymentStatus: "مدفوع",
+      subscriptionStatus: "Active",
+      responsibleEmployee: req.user?._id,
+      startDate: startDate ? new Date(startDate) : new Date(),
+      endDate,
+      slug: `arabicSlugify(${firstName}-${lastName})`,
+      refreshToken,
+    });
+
+    // populate البيانات
+    const populatedMember = await userModel.findById(member._id)
+      .populate({ path: "roleId", select: "name description" })
+      .populate({ path: "packageId", select: "name price_cents duration_value duration_unit price_type" })
+      .populate({ path: "responsibleEmployee", select: "firstName lastName email" })
+      .populate({ path: "coachId", select: "_id username firstName lastName email phoneNumber" })
+      .lean();
+
+    // إرسال إيميل تأكيد
+    const confirmToken = jwt.sign({ email }, process.env.CONFIRMEMAILTOKEN, { expiresIn: "1h" });
+    await sendEmail(email, "تأكيد الحساب في النظام", confirmToken);
+
+    // ربط العضو بالمدرب
+    if (coachId) {
+      await userModel.findByIdAndUpdate(coachId, { $push: { members: member._id } });
+    }
+
+    // الرد النهائي
+    return res.status(201).json({
+      message: "تم إنشاء المشترك بنجاح",
+      member: populatedMember,
+      package: {
+        name: selectedPackage.name,
+        price: selectedPackage.price_cents / 100,
+        duration: `${selectedPackage.duration_value} ${selectedPackage.duration_unit}`,
+        paymentMethod,
+        updatedPrice: fees ? fees : selectedPackage.price_cents / 100, // السعر المُدخل (إن وُجد)
+      },
+    });
+
+  } catch (error) {
+    next(error);
+    console.error(error);
+  }
+};
 
 export const createMember = async (req, res, next) => {
   try {

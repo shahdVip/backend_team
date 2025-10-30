@@ -88,12 +88,9 @@ function convertArabicTimeTo24Hour(timeStr) {
   if (period === "م" && hour < 12) hour += 12;
   if (period === "ص" && hour === 12) hour = 0;
 
-  // صيغة 24 ساعة
   return `${hour.toString().padStart(2, "0")}:${minute}`;
 }
 
-
-// --- CREATE BOOKING (Enhanced) ---
 export const createBooking = async (req, res) => {
   try {
     const {
