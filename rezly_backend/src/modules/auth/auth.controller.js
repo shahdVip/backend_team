@@ -405,6 +405,7 @@ export const updateEmployee = async (req, res) => {
 };
 export const createMemberprice = async (req, res, next) => {
   try {
+    console.log("Request body:", req.body);
     if (req.user?.role !== "Admin") {
       return next(new AppError("غير مصرح لك بإنشاء مشترك جديد", 403));
     }
