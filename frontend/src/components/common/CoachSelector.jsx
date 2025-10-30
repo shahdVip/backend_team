@@ -1,13 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import downarrowIcon from "../../icons/downarrow.svg";
 import SearchIcon from "../../icons/search.svg?react";
 import AddcircleIcon from "../../icons/addcircle.svg?react";
 import trainerIcon from "../../icons/trainer.svg";
+import { getAllEmployees } from "../../api"; // تأكد المسار صح
 
 export default function CoachSelector({
   selectedCoach,
   setSelectedCoach,
-  coachesList,
   showIcon = true,
   placeholderColor = "text-black",
   borderStyle = "#7E818C",
@@ -15,10 +15,33 @@ export default function CoachSelector({
 }) {
   const [openCoach, setOpenCoach] = useState(false);
   const [coachSearch, setCoachSearch] = useState("");
+  const [coaches, setCoaches] = useState([]);
 
-  const filteredCoaches = Array.isArray(coachesList)
-    ? coachesList.filter((c) =>
-        c?.name?.toLowerCase().includes(coachSearch.toLowerCase())
+  useEffect(() => {
+    const fetchCoaches = async () => {
+      try {
+        const res = await getAllEmployees();
+        const employees = Array.isArray(res.employees) ? res.employees : [];
+        const filteredCoaches = employees
+          .filter((emp) => emp.role === "Coach")
+          .map((c) => ({
+            ...c,
+            name:
+              `${c.firstName || ""} ${c.lastName || ""}`.trim() ||
+              c.username ||
+              "مدرب بدون اسم",
+          }));
+        setCoaches(filteredCoaches);
+      } catch (err) {
+        console.error("❌ خطأ أثناء جلب المدربين:", err);
+      }
+    };
+    fetchCoaches();
+  }, []);
+
+  const filteredCoaches = Array.isArray(coaches)
+    ? coaches.filter((c) =>
+        c?.name.toLowerCase().includes(coachSearch.toLowerCase())
       )
     : [];
 
@@ -33,20 +56,19 @@ export default function CoachSelector({
         {showIcon && (
           <img src={trainerIcon} alt="trainer" className="absolute right-2" />
         )}
-         <span
+        <span
           className={`h-10 w-full flex items-center ${
             showIcon ? "pr-8" : "pr-2"
           } pl-2 font-normal ${
             selectedCoach
               ? variant === "event"
-                ? "text-black font-bold" // ✅ لما يكون بالأيفنت، الخط بولد
-                : "text-gray-800" // بالحجز العادي يضل فاتح
+                ? "text-black font-bold"
+                : "text-gray-800"
               : placeholderColor
           }`}
         >
           {selectedCoach?.name || "اختر المدرب"}
         </span>
-
         <img src={downarrowIcon} alt="downarrow" className="absolute left-2" />
       </div>
 
@@ -69,25 +91,24 @@ export default function CoachSelector({
             <div className="flex items-center gap-2 mb-2 cursor-pointer px-3 py-2 hover:bg-gray-100">
               <AddcircleIcon className="w-4 h-4 text-[var(--color-purple)]" />
               <span
-  className={`font-normal ${
-    variant === "event" ? "text-black font-bold" : "text-gray-800"
-  }`}
->
-  إضافة جديد
-</span>
-
+                className={`font-normal ${
+                  variant === "event" ? "text-black font-bold" : "text-gray-800"
+                }`}
+              >
+                إضافة جديد
+              </span>
             </div>
 
             {/* قائمة المدربين */}
             {filteredCoaches.length > 0 ? (
-              filteredCoaches.map((coach, idx) => {
+              filteredCoaches.map((coach) => {
                 const isSelected =
                   String(selectedCoach?.id || selectedCoach?._id) ===
                   String(coach.id || coach._id);
 
                 return (
                   <div
-                    key={idx}
+                    key={coach._id || coach.id}
                     className="flex items-center justify-between h-[32px] px-3 py-2 cursor-pointer hover:bg-gray-100 border-b border-[rgba(126,129,140,0.4)] last:border-b-0"
                     onClick={() => {
                       setSelectedCoach(coach);

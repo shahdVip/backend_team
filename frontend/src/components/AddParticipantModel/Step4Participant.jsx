@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { getAllPackages } from "../../api";
+import { getAllPackages, getAllEmployees } from "../../api";
 
-export default function Step4Participant({ memberData, setMemberData, packages = [] }) {
+export default function Step4Participant({
+  memberData,
+  setMemberData,
+  packages = [],
+}) {
   const [selectedPackage, setSelectedPackage] = useState(null);
   // عند تحميل العضو، تحقق من القيمة
-const [paymentMethod, setPaymentMethod] = useState(
-  memberData.paymentMethod === "نقداً"
-    ? "نقداً"
-    : memberData.paymentMethod === "بطاقة"
-    ? "بطاقة"
-    : ""
-);
+  const [paymentMethod, setPaymentMethod] = useState(
+    memberData.paymentMethod === "نقداً"
+      ? "نقداً"
+      : memberData.paymentMethod === "بطاقة"
+      ? "بطاقة"
+      : ""
+  );
 
   const [trainer, setTrainer] = useState(memberData.trainer || "");
 
@@ -76,6 +80,27 @@ const [paymentMethod, setPaymentMethod] = useState(
     updateMemberField("paymentMethod", newMethod);
   };
 
+  const [coaches, setCoaches] = useState([]);
+
+  useEffect(() => {
+    const fetchCoaches = async () => {
+      try {
+        const res = await getAllEmployees(); // نداء الـ API
+        // تأكد أن الريسبونس فيه employees
+        const employees = Array.isArray(res.employees) ? res.employees : [];
+
+        // فلترة فقط المدربين
+        const filteredCoaches = employees.filter((emp) => emp.role === "Coach");
+
+        setCoaches(filteredCoaches);
+      } catch (err) {
+        console.error("❌ خطأ أثناء جلب المدربين:", err);
+      }
+    };
+
+    fetchCoaches();
+  }, []);
+
   // تغيير المدرب
   const handleTrainerChange = (e) => {
     const newTrainer = e.target.value;
@@ -90,11 +115,9 @@ const [paymentMethod, setPaymentMethod] = useState(
     // تحديث في الباك
     updateMemberField("coachId", newTrainer);
   };
-useEffect(() => {
- console.log(memberData);
-
-}, [memberData]);
-
+  useEffect(() => {
+    console.log(memberData);
+  }, [memberData]);
 
   return (
     <div className="flex justify-center bg-white w-full">
@@ -127,8 +150,9 @@ useEffect(() => {
             type="text"
             value={
               selectedPackage
-                ? `${selectedPackage.duration_value || ""} ${selectedPackage.duration_unit || ""
-                }`
+                ? `${selectedPackage.duration_value || ""} ${
+                    selectedPackage.duration_unit || ""
+                  }`
                 : ""
             }
             readOnly
@@ -141,36 +165,32 @@ useEffect(() => {
           <label className="text-[14px] font-[700] text-black">الرسوم</label>
           <input
             type="text"
-            value={
-              selectedPackage?.price_cents
-                ? (selectedPackage.price_cents / 100).toString()
-                : ""
+            value={memberData.fees ? memberData.fees.toString() : ""}
+            onChange={(e) =>
+              setMemberData({
+                ...memberData,
+                fees: parseFloat(e.target.value || 0), // السعر بالدولار أو الوحدة المناسبة
+              })
             }
-            readOnly
-            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[12px] text-gray-500 bg-gray-100 cursor-not-allowed"
+            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[12px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-600"
           />
         </div>
 
-       {/* طريقة الدفع */}
-<div className="flex flex-col gap-2">
-  <label className="text-[14px] font-[700] text-black">
-    طريقة الدفع <span className="text-red-500">*</span>
-  </label>
- <select
-  value={paymentMethod}
-  onChange={handlePaymentChange}
-  className="w-full border border-gray-300 rounded-xl px-2.5 py-3 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-600"
->
-  <option value="">اختر طريقة الدفع</option>
-  <option value="نقداً">نقداً</option>
-  <option value="بطاقة">بطاقة</option>
-    <option value="أونلاين">أونلاين</option>
-
-</select>
-
-</div>
-
-
+        {/* طريقة الدفع */}
+        <div className="flex flex-col gap-2">
+          <label className="text-[14px] font-[700] text-black">
+            طريقة الدفع <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={paymentMethod}
+            onChange={handlePaymentChange}
+            className="w-full border border-gray-300 rounded-xl px-2.5 py-3 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-600"
+          >
+            <option value="">اختر طريقة الدفع</option>
+            <option value="نقداً">نقداً</option>
+            <option value="بطاقة">بطاقة</option>
+          </select>
+        </div>
 
         {/* المدرب */}
         <div className="flex flex-col gap-2">
@@ -183,19 +203,20 @@ useEffect(() => {
             className="w-full border border-gray-300 rounded-xl px-2.5 py-3 text-[12px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-600"
           >
             <option value="">اختر المدرب المسؤول</option>
-            {/* إذا فيه مدرب محدد مسبقًا */}
-            {memberData.coachId && (
-              <option value={memberData.coachId._id}>
-                {memberData.coachId.firstName} {memberData.coachId.lastName}
 
-              </option>
+            {coaches.length > 0 ? (
+              coaches.map((coach) => (
+                <option key={coach._id} value={coach._id}>
+                  {`${coach.firstName || ""} ${coach.lastName || ""}`.trim() ||
+                    coach.username ||
+                    "مدرب بدون اسم"}
+                </option>
+              ))
+            ) : (
+              <option disabled>لا يوجد مدربين</option>
             )}
-            {/* باقي المدربين */}
-            <option value="68e102cb63883a6b59bf4eac">أحمد خليل</option>
           </select>
         </div>
-
-
       </form>
     </div>
   );

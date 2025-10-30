@@ -4,8 +4,9 @@ const api = axios.create({
   baseURL: "https://rezly-ddms-rifd-2025y-01p.onrender.com",
 });
 
-const FIXED_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4ZTgxNjE2YWRkZWM2YmI5OTYzYTBkMyIsImlhdCI6MTc2MDI4ODExOSwiZXhwIjoxNzYyODgwMTE5fQ.otxs7BqWLTxQxjYmMJ8gXqnl5pbyOB0_VgwX1E6OQR0";
+// const FIXED_TOKEN =
+//   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4ZTgxNjE2YWRkZWM2YmI5OTYzYTBkMyIsImlhdCI6MTc2MDI4ODExOSwiZXhwIjoxNzYyODgwMTE5fQ.otxs7BqWLTxQxjYmMJ8gXqnl5pbyOB0_VgwX1E6OQR0";
+const FIXED_TOKEN = localStorage.getItem("token");
 
 // إضافة موظف
 export const createEmployee = async (formData) => {
@@ -14,7 +15,6 @@ export const createEmployee = async (formData) => {
       "Content-Type": "multipart/form-data",
       Authorization: `Bearer ${FIXED_TOKEN}`,
     },
-
   });
   console.log("response من API:", res.data);
 
@@ -44,7 +44,7 @@ export const toggleEmployeeStatus = async (id, active) => {
 const handleDeleteEmployee = async (id) => {
   try {
     await toggleEmployeeStatus(id, false);
-    const updated = employees.filter(emp => emp._id !== id);
+    const updated = employees.filter((emp) => emp._id !== id);
     setEmployees(updated);
     setEmployeeCount(updated.length);
   } catch (err) {
@@ -97,7 +97,6 @@ export const updateEmployeeRole = async (id, newRole) => {
 
     console.log(" Role updated successfully:", res.data);
     return res.data;
-
   } catch (err) {
     console.error(" Error updating role:");
     console.error("Message:", err.message);
@@ -141,7 +140,9 @@ export const addNewMember = async (memberData) => {
       if (filteredData.nationalId) {
         filteredData.userName = `user${filteredData.nationalId}`;
       } else if (filteredData.fullName) {
-        filteredData.userName = filteredData.fullName.replace(/\s+/g, "").toLowerCase();
+        filteredData.userName = filteredData.fullName
+          .replace(/\s+/g, "")
+          .toLowerCase();
       } else {
         filteredData.userName = `user${Date.now()}`; // احتياط
       }
@@ -150,9 +151,8 @@ export const addNewMember = async (memberData) => {
     if (!filteredData.password) {
       filteredData.password = "123456"; // كلمة مرور مؤقتة
     }
-
     // 🚀 إرسال الطلب بعد التنظيف
-    const res = await api.post("/auth/addNewMember", filteredData, {
+    const res = await api.post("/auth/addNewMember3", filteredData, {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${FIXED_TOKEN}`,
@@ -162,43 +162,43 @@ export const addNewMember = async (memberData) => {
     console.log(" تم إضافة المشترك:", res.data);
     return res.data;
   } catch (err) {
-    console.error(" خطأ أثناء إضافة المشترك:", err.response?.data || err.message);
+    console.error(
+      " خطأ أثناء إضافة المشترك:",
+      err.response?.data || err.message
+    );
     throw err;
   }
 };
-
 
 // جلب جميع الأعضاء (المشتركين)
 export const getAllMembers = async () => {
-
   try {
+    const token = localStorage.getItem("token"); // استخدام التوكن الديناميكي
     const res = await api.get("/auth/getAllMembers", {
       headers: {
-        Authorization: `Bearer ${FIXED_TOKEN}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
-    return res.data;
+    // ارجع فقط members لأنها المصفوفة اللي نحتاجها
+    return res.data.members || [];
   } catch (err) {
-    console.error("❌ خطأ أثناء جلب الأعضاء:", err);
+    console.error("❌ خطأ أثناء جلب الأعضاء:", err.response?.data || err);
     throw err;
   }
 };
-export const getmemb =async()=>{
-  try{
-     const res= await axios.get("/auth/getAllMembers",{
- headers:{
-    authorization: `Bearer ${FIXED_TOKEN}`
-  }
-     });
- 
 
-  }catch(e){
-    console.log("mmmmmmmmmmmm")
+export const getmemb = async () => {
+  try {
+    const res = await axios.get("/auth/getAllMembers", {
+      headers: {
+        authorization: `Bearer ${FIXED_TOKEN}`,
+      },
+    });
+  } catch (e) {
+    console.log("mmmmmmmmmmmm");
   }
- 
-
-}
+};
 
 export const deleteMember = async (id) => {
   if (!id) throw new Error("Missing member ID");
@@ -217,7 +217,10 @@ export const deleteMember = async (id) => {
       throw new Error(`حذف المشترك فشل برمز ${response.status}`);
     }
   } catch (error) {
-    console.error(" خطأ أثناء حذف المشترك:", error.response?.data || error.message);
+    console.error(
+      " خطأ أثناء حذف المشترك:",
+      error.response?.data || error.message
+    );
     throw error;
   }
 };
@@ -232,7 +235,10 @@ export const getAllPackages = async () => {
     console.log("📦 قائمة الباقات:", res.data);
     return res.data.packages || [];
   } catch (err) {
-    console.error("❌ خطأ أثناء جلب الباقات:", err.response?.data || err.message);
+    console.error(
+      "❌ خطأ أثناء جلب الباقات:",
+      err.response?.data || err.message
+    );
     throw err;
   }
 };
@@ -247,31 +253,33 @@ export const updateMember = async (memberId, memberData) => {
         Authorization: `Bearer ${FIXED_TOKEN}`,
         "Content-Type": "application/json",
       },
-      
     });
 
     console.log("📦 رد السيرفر بعد تحديث المشترك:", res.data);
     return res.data;
   } catch (err) {
-    console.error("❌ خطأ أثناء تحديث المشترك:", err.response?.data || err.message);
+    console.error(
+      "❌ خطأ أثناء تحديث المشترك:",
+      err.response?.data || err.message
+    );
     throw err;
   }
 };
-  const updateMemberPayment = async (newPaymentMethod) => {
-    try {
-      const response = await axios.put(
-        `/auth/updateMember/${memberId}`,
-        { paymentMethod: newPaymentMethod },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      console.log("✅ تم تحديث طريقة الدفع:", response.data);
-    } catch (error) {
-      console.error("❌ خطأ أثناء تحديث طريقة الدفع:", error);
-    }
-  };
+const updateMemberPayment = async (newPaymentMethod) => {
+  try {
+    const response = await axios.put(
+      `/auth/updateMember/${memberId}`,
+      { paymentMethod: newPaymentMethod },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    console.log("✅ تم تحديث طريقة الدفع:", response.data);
+  } catch (error) {
+    console.error("❌ خطأ أثناء تحديث طريقة الدفع:", error);
+  }
+};
 
 export default api;

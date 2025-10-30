@@ -42,8 +42,7 @@
   border-collapse: collapse;
   text-align: center;
   font-size: 12px; /* تم التغيير */
-color: #000;
-
+  color: #000;
 }
 
 .attendance-table thead {
@@ -60,10 +59,10 @@ color: #000;
   border-top-right-radius: 8px;
   border-bottom-right-radius: 8px;
 }
-.table-title{
-  font-weight: 600!important;
+.table-title {
+  font-weight: 600 !important;
 }
-.attendance-table th, 
+.attendance-table th,
 .attendance-table td {
   padding: 12px;
   border-bottom: 1px solid #eee;
@@ -74,16 +73,15 @@ color: #000;
   border-bottom: 1px solid #eee;
   text-align: center;
 }
- .attendance-table tr {
-color: var(--Color-white, #FFF);
+.attendance-table tr {
+  color: var(--Color-white, #fff);
 
-/* body/12/bold */
-font-family: Cairo;
-font-size: 12px;
-font-style: normal;
-font-weight: 700;
-line-height: 150%; /* 18px */
-
+  /* body/12/bold */
+  font-family: Cairo;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 150%; /* 18px */
 }
 /* تلوين الصفوف الزوجية */
 .attendance-table tbody tr:nth-child(even) {
@@ -94,8 +92,7 @@ line-height: 150%; /* 18px */
 .status-badge {
   padding: 4px 10px;
   border-radius: 8px;
-  font-weight: bold;
-  color: #fff;
+  color: #000;
   font-size: 10px; /* تم التغيير */
 }
 
@@ -104,19 +101,18 @@ line-height: 150%; /* 18px */
 }
 
 .status-present {
-  background: var(--color-purple)
+  background: var(--color-purple);
 }
-.table-text{
+.table-text {
+  color: var(--Color-black, #000);
 
-color: var(--Color-black, #000);
-
-/* body/12/semibold */
-font-family: Cairo;
-font-size: 12px;
-font-style: normal;
-font-weight: 600;
-line-height: 150%; /* 18px */
+  /* body/12/semibold */
+  font-family: Cairo;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 150%; /* 18px */
 }
-.status-mouth{
+.status-mouth {
   background-color: var(--color-green);
 }

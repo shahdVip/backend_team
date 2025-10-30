@@ -1,43 +1,36 @@
-import React, { useState } from "react";
-import "../AttendanceTable/AttendanceTable.css"; 
-
-const clients = [
-   { id: 1, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 2, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 3, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 4, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 5, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 6, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 7, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 8, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 9, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 10, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 11, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 12, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 13, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-    { id: 14, name: "بيان عبد الحق", email: "bayan7abdalhaq@gmail.com", phone: "0598702003", subscriptionType: "شهري", startDate: "1/10/2025", endDate: "1/11/2025", file: "عرض" },
-
-
-
-
-];
+import { useEffect, useState } from "react";
+import "../AttendanceTable/AttendanceTable.css";
+import { getAllMembers } from "../../api.js";
 
 export default function SubscribersTab() {
+  const [clients, setClients] = useState([]);
   const [selectedClients, setSelectedClients] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
+
+  useEffect(() => {
+    const fetchMembers = async () => {
+      try {
+        const members = await getAllMembers();
+        setClients(members); // الآن clients مصفوفة جاهزة للـ map
+      } catch (err) {
+        console.error("❌ خطأ أثناء تحميل الأعضاء:", err);
+      }
+    };
+    fetchMembers();
+  }, []);
 
   const handleSelectAll = () => {
     if (selectAll) {
       setSelectedClients([]);
     } else {
-      setSelectedClients(clients.map(c => c.id));
+      setSelectedClients(clients.map((c) => c.id));
     }
     setSelectAll(!selectAll);
   };
 
   const handleSelectClient = (id) => {
     if (selectedClients.includes(id)) {
-      setSelectedClients(selectedClients.filter(c => c !== id));
+      setSelectedClients(selectedClients.filter((c) => c !== id));
     } else {
       setSelectedClients([...selectedClients, id]);
     }
@@ -75,24 +68,32 @@ export default function SubscribersTab() {
                   onChange={() => handleSelectClient(client.id)}
                 />
               </td>
-              <td className="table-text">{client.name}</td>
+              <td className="table-text">
+                {[client.firstName, client.lastName].filter(Boolean).join(" ")}
+              </td>
+
               <td className="table-text">{client.email}</td>
               <td className="table-text">{client.phone}</td>
               <td>
                 <span
-                  className={`status-badge ${
+                  className={`table-text ${
                     client.subscriptionType === "شهري"
                       ? "status-mouth"
                       : "status-weekly"
                   }`}
                 >
-                  {client.subscriptionType}
+                  {client.packageId.name}
                 </span>
               </td>
-              <td className="table-text">{client.startDate}</td>
-              <td className="table-text">{client.endDate}</td>
+              <td className="table-text">
+                {new Date(client.startDate).toLocaleDateString("en-GB")}
+              </td>
+              <td className="table-text">
+                {new Date(client.endDate).toLocaleDateString("en-GB")}
+              </td>
+
               <td className="table-text text-[var(--color-purple)] underline cursor-pointer">
-                {client.file}
+                عرض
               </td>
 
               <td className="table-text flex justify-center gap-2">

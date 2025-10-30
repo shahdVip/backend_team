@@ -13,7 +13,7 @@ export const step1Schema = Yup.object().shape({
   gender: Yup.string().required("يجب اختيار الجنس"),
 
   nationalId: Yup.string()
-    .matches(/^\d{10}$/, "رقم الهوية يجب أن يتكون من 10 أرقام")
+    .matches(/^\d{9}$/, "رقم الهوية يجب أن يتكون من 9 أرقام")
     .notRequired()
     .nullable()
     .transform((value) => (value === "" ? null : value)),
@@ -35,9 +35,7 @@ export const step4Schema = Yup.object().shape({
 
   role: Yup.string().required("مستوى الصلاحية مطلوب"),
 
-  notes: Yup.string()
-    .required("يرجى إضافة ملاحظات")
-    .min(3, "يجب أن تحتوي الملاحظات على 3 أحرف على الأقل"),
+  notes: Yup.string().min(3, "يجب أن تحتوي الملاحظات على 3 أحرف على الأقل"),
 });
 
 // Step 2 (بيانات الاتصال)

@@ -6,6 +6,7 @@ import MaxParticipantsSelector from "../../../components/common/MaxParticipantsS
 import downarrowIcon from "../../../icons/downarrow.svg";
 import SearchIcon from "../../../icons/search.svg?react";
 import AddcircleIcon from "../../../icons/addcircle.svg?react";
+import { getAllPackages, getAllEmployees } from "../../../api";
 
 export default function Step1Booking({
   formData,
@@ -15,67 +16,90 @@ export default function Step1Booking({
   isIndividual = false,
   isCoach = false,
 }) {
-  const [coaches, setCoaches] = useState([]);
   const [openClass, setOpenClass] = useState(false);
   const [classSearch, setClassSearch] = useState("");
   const [classes, setClasses] = useState(["يوغا", "كارديو", "ملاكمة"]);
   const [rooms] = useState(["قاعة 1", "قاعة 2", "قاعة 3"]);
 
   const isReadOnly = !!isIndividual; // 🟣 قفل الحقول لو تعديل فردي
+  const [coaches, setCoaches] = useState([]);
 
+  useEffect(() => {
+    const fetchCoaches = async () => {
+      try {
+        const res = await getAllEmployees(); // نداء الـ API
+        const employees = Array.isArray(res.employees) ? res.employees : [];
+
+        // فلترة فقط المدربين
+        const filteredCoaches = employees.filter((emp) => emp.role === "Coach");
+
+        setCoaches(filteredCoaches);
+      } catch (err) {
+        console.error("❌ خطأ أثناء جلب المدربين:", err);
+      }
+    };
+
+    fetchCoaches();
+  }, []);
   // جلب قائمة المدربين
   useEffect(() => {
-  const fetchCoaches = async () => {
-    try {
-      // ✅ استخدم التوكن الحقيقي من localStorage
-      const token =
-        localStorage.getItem("authToken") || import.meta.env.VITE_API_TOKEN || "";
+    const fetchCoaches = async () => {
+      try {
+        // ✅ استخدم التوكن الحقيقي من localStorage
+        const token =
+          localStorage.getItem("authToken") ||
+          import.meta.env.VITE_API_TOKEN ||
+          "";
 
-      const res = await axios.get(
-        "https://rezly-ddms-rifd-2025y-01p.onrender.com/auth/getAllEmployees",
-        {
-          headers: {
-            Authorization: token.startsWith("Bearer")
-              ? token
-              : `Bearer ${token}`,
-          },
-        }
-      );
+        const res = await axios.get(
+          "https://rezly-ddms-rifd-2025y-01p.onrender.com/auth/getAllEmployees",
+          {
+            headers: {
+              Authorization: token.startsWith("Bearer")
+                ? token
+                : `Bearer ${token}`,
+            },
+          }
+        );
 
-      // ✅ فلترة فقط المدربين
-      const coachList = res.data?.employees
-        ?.filter((emp) => emp.role === "Coach")
-        .map((emp) => ({
-          id: emp._id,
-          name: `${emp.firstName || ""} ${emp.lastName || ""}`.trim(),
-        })) || [];
+        // ✅ فلترة فقط المدربين
+        const coachList =
+          res.data?.employees
+            ?.filter((emp) => emp.role === "Coach")
+            .map((emp) => ({
+              id: emp._id,
+              name: `${emp.firstName || ""} ${emp.lastName || ""}`.trim(),
+            })) || [];
 
-      setCoaches(coachList);
-      console.log("✅ أسماء المدربين:", coachList.map((c) => c.name));
+        setCoaches(coachList);
+        console.log(
+          "✅ أسماء المدربين:",
+          coachList.map((c) => c.name)
+        );
+      } catch (err) {
+        console.error(
+          "❌ خطأ في جلب المدربين:",
+          err.response?.data || err.message
+        );
+      }
+    };
 
-    } catch (err) {
-      console.error("❌ خطأ في جلب المدربين:", err.response?.data || err.message);
-    }
-  };
-
-  fetchCoaches();
-}, []);
-
+    fetchCoaches();
+  }, []);
 
   const handleClassSelect = (cls) => {
-  if (isReadOnly) return;
+    if (isReadOnly) return;
 
-  setFormData((prev) => ({
-    ...prev,
-    title: cls,
-    service: cls, // 🟣 ضروري للباك (هو اللي بنبعت بـ PUT)
-  }));
+    setFormData((prev) => ({
+      ...prev,
+      title: cls,
+      service: cls, // 🟣 ضروري للباك (هو اللي بنبعت بـ PUT)
+    }));
 
-  setOpenClass(false);
-  setClassSearch("");
-  if (errors?.title) setErrors((prev) => ({ ...prev, title: null }));
-};
-
+    setOpenClass(false);
+    setClassSearch("");
+    if (errors?.title) setErrors((prev) => ({ ...prev, title: null }));
+  };
 
   const handleAddNewClass = () => {
     if (isReadOnly) return;
@@ -86,18 +110,17 @@ export default function Step1Booking({
     }
   };
 
-// 🟣 إغلاق القوائم عند الضغط خارجها
-useEffect(() => {
-  const handleClickOutside = (e) => {
-    // إذا العنصر المفتوح مو جزء من العنصر اللي تم الضغط عليه
-    if (!e.target.closest(".dropdown-step1")) {
-      setOpenClass(false);
-    }
-  };
-  document.addEventListener("mousedown", handleClickOutside);
-  return () => document.removeEventListener("mousedown", handleClickOutside);
-}, []);
-
+  // 🟣 إغلاق القوائم عند الضغط خارجها
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      // إذا العنصر المفتوح مو جزء من العنصر اللي تم الضغط عليه
+      if (!e.target.closest(".dropdown-step1")) {
+        setOpenClass(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <div className="flex justify-center bg-white w-full text-black text-[14px]">
@@ -110,7 +133,11 @@ useEffect(() => {
           <div
             className={`w-full h-10 rounded-[8px] flex items-center justify-between relative border ${
               errors?.title ? "border-red-500" : "border-gray-300"
-            } ${isReadOnly ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "cursor-pointer"}`}
+            } ${
+              isReadOnly
+                ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                : "cursor-pointer"
+            }`}
             onClick={() => !isReadOnly && setOpenClass(!openClass)}
           >
             <span
@@ -174,15 +201,16 @@ useEffect(() => {
                       >
                         {cls}
                         <div
-  className={`w-4 h-4 flex items-center justify-center rounded-full border-2 ${
-    isSelected ? "border-[var(--color-purple)]" : "border-[var(--color-purple)]"
-  }`}
->
-  {isSelected && (
-    <div className="w-2 h-2 rounded-full bg-[var(--color-purple)]"></div>
-  )}
-</div>
-
+                          className={`w-4 h-4 flex items-center justify-center rounded-full border-2 ${
+                            isSelected
+                              ? "border-[var(--color-purple)]"
+                              : "border-[var(--color-purple)]"
+                          }`}
+                        >
+                          {isSelected && (
+                            <div className="w-2 h-2 rounded-full bg-[var(--color-purple)]"></div>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -200,7 +228,7 @@ useEffect(() => {
         </div>
 
         {/* الوصف */}
-        <div >
+        <div>
           <label className="block font-bold text-sm mb-1">
             الوصف <span className="text-red-500">*</span>
           </label>
@@ -218,7 +246,11 @@ useEffect(() => {
             disabled={isReadOnly}
             className={`w-full h-10 border rounded-md px-3 focus:outline-none placeholder-gray-400 ${
               errors?.description ? "border-red-500" : "border-gray-300"
-            } ${isReadOnly ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}`}
+            } ${
+              isReadOnly
+                ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                : "bg-white"
+            }`}
           />
           {errors?.description && (
             <p className="text-red-500 text-xs mt-1">{errors.description}</p>
@@ -228,18 +260,21 @@ useEffect(() => {
         {/* المدرب */}
         {!isCoach && (
           <>
-            <div className={`${isReadOnly ? "opacity-50 pointer-events-none" : ""}`}>
+            <div
+              className={`${
+                isReadOnly ? "opacity-50 pointer-events-none" : ""
+              }`}
+            >
               <CoachSelector
                 selectedCoach={formData.coach}
                 setSelectedCoach={(coach) => {
-                  if (isReadOnly) return;
-                  setFormData({ ...formData, coachId: coach.id, coach });
-                  if (errors?.coach)
-                    setErrors((prev) => ({ ...prev, coach: null }));
+                  setFormData({
+                    ...formData,
+                    coach: { id: coach._id || coach.id, name: coach.name },
+                    coachId: coach._id || coach.id,
+                  });
                 }}
                 coachesList={coaches}
-                placeholderColor="text-gray-400"
-                borderStyle={errors?.coach ? "red" : "#D1D5DB"}
               />
             </div>
             {errors?.coach && (
@@ -249,16 +284,18 @@ useEffect(() => {
         )}
 
         {/* القاعة */}
-        <div className={`${isReadOnly ? "opacity-50 pointer-events-none" : ""}`}>
+        <div
+          className={`${isReadOnly ? "opacity-50 pointer-events-none" : ""}`}
+        >
           <LocationSelector
             selectedLocation={formData.room}
             setSelectedLocation={(loc) => {
               if (isReadOnly) return;
               setFormData((prev) => ({
-  ...prev,
-  room: loc,
-  location: loc, // 🟣 هذا الحقل اللي الباك بيستخدمه
-}));
+                ...prev,
+                room: loc,
+                location: loc, // 🟣 هذا الحقل اللي الباك بيستخدمه
+              }));
 
               if (errors?.room) setErrors((prev) => ({ ...prev, room: null }));
             }}
@@ -273,15 +310,17 @@ useEffect(() => {
         )}
 
         {/* عدد المشتركين */}
-        <div className={`${isReadOnly ? "opacity-50 pointer-events-none" : ""}`}>
+        <div
+          className={`${isReadOnly ? "opacity-50 pointer-events-none" : ""}`}
+        >
           <MaxParticipantsSelector
             selectedMax={formData.maxMembers}
             setSelectedMax={(value) => {
               if (isReadOnly) return;
               setFormData((prev) => ({
-  ...prev,
-  maxMembers: Number(value), // 🟣 تأكيد إنه دايمًا رقم
-}));
+                ...prev,
+                maxMembers: Number(value), // 🟣 تأكيد إنه دايمًا رقم
+              }));
 
               if (errors?.maxMembers)
                 setErrors((prev) => ({ ...prev, maxMembers: null }));

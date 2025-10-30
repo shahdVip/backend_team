@@ -8,7 +8,12 @@ import { addNewMember, updateMember, getAllPackages } from "../../api";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-const AddParticipantModel = ({ onClose, isEditMode = false, editData = null, onSave }) => {
+const AddParticipantModel = ({
+  onClose,
+  isEditMode = false,
+  editData = null,
+  onSave,
+}) => {
   const [activeStep, setActiveStep] = useState(0);
   const [packages, setPackages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +35,12 @@ const AddParticipantModel = ({ onClose, isEditMode = false, editData = null, onS
     coachId: "",
   });
 
-  const steps = ["المعلومات الشخصية", "بيانات الاتصال", "الملف الصحي", "تفاصيل الاشتراك"];
+  const steps = [
+    "المعلومات الشخصية",
+    "بيانات الاتصال",
+    "الملف الصحي",
+    "تفاصيل الاشتراك",
+  ];
 
   const step1Ref = useRef();
   const step2Ref = useRef();
@@ -89,52 +99,53 @@ const AddParticipantModel = ({ onClose, isEditMode = false, editData = null, onS
       }
 
       setIsLoading(true);
-      const result = await addNewMember(memberData);
+
+      const result = await addNewMember(memberData); // memberData يحتوي على fees الآن
+
       toast.success("تم إضافة المشترك بنجاح!");
       setIsSubmitted(true);
 
       if (onSave) onSave(result);
       onClose();
     } catch (error) {
-      console.error("  خطأ أثناء الإضافة:", error);
+      console.error("خطأ أثناء الإضافة:", error);
       toast.error("حدث خطأ أثناء إضافة المشترك!");
     } finally {
       setIsLoading(false);
     }
   };
 
-const handleSaveChanges = async () => {
-  try {
-    setIsLoading(true);
-    const updatedMember = {
-      firstName: memberData.firstName,
-      lastName: memberData.lastName,
-      gender: memberData.gender,
-      idNumber: memberData.idNumber,
-      birthDate: memberData.birthDate,
-      phone: memberData.phone,
-      email: memberData.email,
-      address: memberData.address,
-      packageId: memberData.packageId,
-      // إذا paymentMethod فارغ، استخدم القيمة القديمة من editData
-      paymentMethod: memberData.paymentMethod || editData.paymentMethod || "",
-      coachId: memberData.coachId,
-      city: memberData.city || "رام الله",
-    };
+  const handleSaveChanges = async () => {
+    try {
+      setIsLoading(true);
+      const updatedMember = {
+        firstName: memberData.firstName,
+        lastName: memberData.lastName,
+        gender: memberData.gender,
+        idNumber: memberData.idNumber,
+        birthDate: memberData.birthDate,
+        phone: memberData.phone,
+        email: memberData.email,
+        address: memberData.address,
+        packageId: memberData.packageId,
+        // إذا paymentMethod فارغ، استخدم القيمة القديمة من editData
+        paymentMethod: memberData.paymentMethod || editData.paymentMethod || "",
+        coachId: memberData.coachId,
+        city: memberData.city || "رام الله",
+      };
 
-    const res = await updateMember(editData._id, updatedMember);
-    toast.success("تم حفظ التعديلات بنجاح!");
-    setIsSubmitted(true);
+      const res = await updateMember(editData._id, updatedMember);
+      toast.success("تم حفظ التعديلات بنجاح!");
+      setIsSubmitted(true);
 
-    if (onSave) onSave(res);
-  } catch (error) {
-    console.error("  خطأ أثناء التعديل:", error);
-    toast.error("حدث خطأ أثناء حفظ التعديلات!");
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+      if (onSave) onSave(res);
+    } catch (error) {
+      console.error("  خطأ أثناء التعديل:", error);
+      toast.error("حدث خطأ أثناء حفظ التعديلات!");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/25 z-50">
@@ -209,17 +220,44 @@ const handleSaveChanges = async () => {
                       {step}
                     </span>
                   </div>
-                  {index < steps.length - 1 && <div className="w-[51px] h-[1px] bg-gray-200"></div>}
+                  {index < steps.length - 1 && (
+                    <div className="w-[51px] h-[1px] bg-gray-200"></div>
+                  )}
                 </React.Fragment>
               ))}
             </div>
 
             {/* محتوى الخطوات */}
             <div className="flex-grow flex flex-col justify-between pr-2 text-[14px]">
-              {activeStep === 0 && <Step1Participant memberData={memberData} setMemberData={setMemberData} ref={step1Ref} />}
-              {activeStep === 1 && <Step2Participant memberData={memberData} setMemberData={setMemberData} ref={step2Ref} />}
-              {activeStep === 2 && <Step3Participant memberData={memberData} setMemberData={setMemberData} ref={step3Ref} />}
-              {activeStep === 3 && <Step4Participant memberData={memberData} setMemberData={setMemberData} packages={packages} ref={step4Ref} />}
+              {activeStep === 0 && (
+                <Step1Participant
+                  memberData={memberData}
+                  setMemberData={setMemberData}
+                  ref={step1Ref}
+                />
+              )}
+              {activeStep === 1 && (
+                <Step2Participant
+                  memberData={memberData}
+                  setMemberData={setMemberData}
+                  ref={step2Ref}
+                />
+              )}
+              {activeStep === 2 && (
+                <Step3Participant
+                  memberData={memberData}
+                  setMemberData={setMemberData}
+                  ref={step3Ref}
+                />
+              )}
+              {activeStep === 3 && (
+                <Step4Participant
+                  memberData={memberData}
+                  setMemberData={setMemberData}
+                  packages={packages}
+                  ref={step4Ref}
+                />
+              )}
             </div>
 
             {/* أزرار التنقل */}

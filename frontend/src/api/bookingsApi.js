@@ -13,7 +13,7 @@ const TOKEN = import.meta.env.VITE_API_TOKEN || "";
 //  قراءة التوكن الحالي من localStorage أو من .env
 function getCurrentToken() {
   const token =
-    localStorage.getItem("authToken") || import.meta.env.VITE_API_TOKEN || "";
+    localStorage.getItem("token") || import.meta.env.VITE_API_TOKEN || "";
   return token.startsWith("Bearer") ? token : `Bearer ${token.trim()}`;
 }
 
@@ -38,7 +38,7 @@ api.interceptors.request.use((config) => {
 ---------------------------------------------------------- */
 export async function getUserFromToken() {
   try {
-    const tokenStr = localStorage.getItem("authToken") || "";
+    const tokenStr = localStorage.getItem("token") || "";
     const token = tokenStr.split(" ")[1];
     if (!token) return null;
 
@@ -52,16 +52,14 @@ export async function getUserFromToken() {
           headers: {
             Authorization: tokenStr.startsWith("Bearer ")
               ? tokenStr
-              : `Bearer ${tokenStr}`
-          }
+              : `Bearer ${tokenStr}`,
+          },
         }
       );
 
       const employees = res.data?.employees || [];
       const found = employees.find(
-        (emp) =>
-          String(emp._id) === String(id) ||
-          String(emp.id) === String(id)
+        (emp) => String(emp._id) === String(id) || String(emp.id) === String(id)
       );
 
       const role = found?.role || "Unknown";
@@ -94,7 +92,6 @@ const getHeaders = () => {
     },
   };
 };
-
 
 // تحويل الوقت إلى 12 ساعة عربية
 const convertTo12Hour = (time) => {
@@ -129,7 +126,7 @@ const durationMap = {
 
 // تحويل التذكير
 const remindersMap = {
-  "0": "0",
+  0: "0",
   "30m": "30m",
   "1h": "1h",
   "1d": "1d",
@@ -174,11 +171,13 @@ export const createBookingAPI = async (bookingData) => {
   }
 };
 
-
 // 🟣 جلب جميع الحجوزات
 export async function getAllBookingsAPI() {
   try {
-    const res = await api.get("/all_booking");
+    const token = localStorage.getItem("token");
+    const res = await api.get("/all_booking", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return res.data.data;
   } catch (err) {
     console.error("خطأ أثناء جلب الحجوزات:", err.response?.data || err);
@@ -193,14 +192,12 @@ export async function getBookingByIdAPI(id) {
     return res.data;
   } catch (err) {
     console.error("فشل جلب الحجز:", err.response?.data || err.message);
-    throw new Error(
-      err.response?.data?.message || "فشل جلب تفاصيل الحجز"
-    );
+    throw new Error(err.response?.data?.message || "فشل جلب تفاصيل الحجز");
   }
 }
 
 export const updateGeneralBookingAPI = async (id, body, mode = "") => {
-let url = `${BASE_URL}/${id}`;
+  let url = `${BASE_URL}/${id}`;
   if (mode === "updateAllSameGroup") {
     url += "?updateAllSameGroup=true";
   }
@@ -208,11 +205,10 @@ let url = `${BASE_URL}/${id}`;
   return res.data;
 };
 
-
 export async function updateSingleScheduleAPI(bookingId, body) {
   try {
     const token =
-      localStorage.getItem("authToken") || import.meta.env.VITE_API_TOKEN || "";
+      localStorage.getItem("token") || import.meta.env.VITE_API_TOKEN || "";
 
     // body لازم يحتوي على updateByDate, timeStart, timeEnd, location, ...الخ
     const res = await api.put(`/${bookingId}`, body, {
@@ -224,12 +220,13 @@ export async function updateSingleScheduleAPI(bookingId, body) {
 
     return res.data;
   } catch (err) {
-    console.error("❌ خطأ في updateSingleScheduleAPI:", err.response?.data || err.message);
+    console.error(
+      "❌ خطأ في updateSingleScheduleAPI:",
+      err.response?.data || err.message
+    );
     throw err;
   }
 }
-
-
 
 // حذف حجز (واحد أو مجموعة)
 export async function deleteBookingAPI(id, isGroup = false) {
@@ -239,9 +236,7 @@ export async function deleteBookingAPI(id, isGroup = false) {
     return res.data;
   } catch (err) {
     console.error("خطأ أثناء حذف الحجز:", err.response?.data || err.message);
-    throw new Error(
-      err.response?.data?.message || "فشل حذف الحجز"
-    );
+    throw new Error(err.response?.data?.message || "فشل حذف الحجز");
   }
 }
 
@@ -304,5 +299,5 @@ export default {
   getBookingsCountAPI,
   getUserFromToken,
   updateSingleScheduleAPI,
-  updateGeneralBookingAPI
+  updateGeneralBookingAPI,
 };

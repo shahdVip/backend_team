@@ -27,7 +27,7 @@ const Login = () => {
     try {
       const res = await signIn(formData);
       if (res.status === 200) {
-        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("token", res.data.refreshToken);
         navigate("/dashboard");
       }
     } catch (err) {
