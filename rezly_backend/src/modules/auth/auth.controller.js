@@ -390,6 +390,7 @@ const {
   paymentMethod,
   coachId,
   password,
+  fees,
 } = req.body;
 
     const existingUser = await userModel.findOne({ $or: [{ email }, { idNumber }] });
