@@ -553,7 +553,7 @@ export const createMemberprice = async (req, res, next) => {
     }
 
     // الرد النهائي
-    return res.status(201).json({
+    return res.status(200).json({
       message: "تم إنشاء المشترك بنجاح",
       member: populatedMember,
       package: {
