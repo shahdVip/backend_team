@@ -542,6 +542,8 @@ export const createMember = async (req, res, next) => {
       birthDate,
       phone,
       email,
+      userName,
+      password,
       address: `${city || ""} - ${address || ""}`,
       image,
       roleId: memberRole._id,
