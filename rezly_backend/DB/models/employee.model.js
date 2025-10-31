@@ -11,7 +11,7 @@ const employeeSchema = new mongoose.Schema({
   },
     nationalId: { type: String, required: true, unique: true }, 
   gender: { type: String, enum: ["ذكر", "أنثى"], required: true }, 
-  phoneNumber: { type: String, required: true },      
+  phoneNumber: { type: String, required: true, unique: true }, // ✅ مهم
   email: { type: String, required: true, unique: true },
   address: { type: String, required: true },           
   jobTitle: { type: String, required: true },          

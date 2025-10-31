@@ -454,13 +454,40 @@ export const deleteBooking = async (req, res, next) => {
     const { user } = req;
     const role = user.role.toLowerCase();
     const { id } = req.params; // ممكن يكون bookingId أو groupId
-    const { type } = req.query; // type=group أو type=single
+    const { type, scheduleId } = req.query; // type=group, type=single, أو scheduleId لحذف جدول واحد
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ status: "error", message: "Invalid ID" });
     }
 
-    let deletedCount = 0;
+if (scheduleId) {
+  const booking = await Booking.findById(id); // بدون .lean()
+  if (!booking)
+    return res.status(404).json({ status: "error", message: "Booking not found" });
+
+  const schedule = booking.schedules.find(s => s._id.toString() === scheduleId);
+  if (!schedule)
+    return res.status(404).json({ status: "error", message: "Schedule not found" });
+
+  // صلاحيات الكوتش
+  if (role === "coach" && schedule.coach.toString() !== user._id.toString()) {
+    return res.status(403).json({ status: "error", message: "Not authorized to delete this schedule" });
+  }
+
+  // حذف الميمبرز المرتبطين بالجدول
+  await BookingMember.deleteMany({ booking: booking._id, schedule: schedule._id });
+
+  // حذف الجدول نفسه
+  booking.schedules = booking.schedules.filter(s => s._id.toString() !== scheduleId);
+  await booking.save();
+
+  return res.status(200).json({
+    status: "success",
+    message: "Schedule deleted successfully",
+    data: booking
+  });
+}
+
 
     // ====== حذف مجموعة كاملة ======
     if (type === "group") {
@@ -472,7 +499,6 @@ export const deleteBooking = async (req, res, next) => {
         });
       }
 
-      // تحقق من صلاحية الكوتش
       if (role === "coach") {
         const isOwner = groupBookings.every(
           (b) => b.coach.toString() === user._id.toString()
@@ -487,18 +513,11 @@ export const deleteBooking = async (req, res, next) => {
 
       const groupBookingIds = groupBookings.map((b) => b._id);
 
-      // حذف جميع الميمبرز المرتبطين بالجروب
       await BookingMember.deleteMany({ booking: { $in: groupBookingIds } });
-
-      // حذف جميع الحجوزات
-      const result = await Booking.deleteMany({
-        _id: { $in: groupBookingIds },
-      });
-      deletedCount = result.deletedCount;
-
+      const result = await Booking.deleteMany({ _id: { $in: groupBookingIds } });
       return res.status(200).json({
         status: "success",
-        message: `Deleted ${deletedCount} bookings and all related members from the group successfully`,
+        message: `Deleted ${result.deletedCount} bookings and all related members from the group successfully`,
       });
     }
 
@@ -506,28 +525,15 @@ export const deleteBooking = async (req, res, next) => {
     else {
       const booking = await Booking.findById(id).lean();
       if (!booking) {
-        return res
-          .status(404)
-          .json({ status: "error", message: "Booking not found" });
+        return res.status(404).json({ status: "error", message: "Booking not found" });
       }
 
-      // تحقق من صلاحيات الكوتش
-      if (
-        role === "coach" &&
-        booking.coach.toString() !== user._id.toString()
-      ) {
-        return res.status(403).json({
-          status: "error",
-          message: "Not authorized to delete this booking",
-        });
+      if (role === "coach" && booking.coach.toString() !== user._id.toString()) {
+        return res.status(403).json({ status: "error", message: "Not authorized to delete this booking" });
       }
 
-      // حذف جميع الميمبرز المرتبطين بهذا الحجز
       await BookingMember.deleteMany({ booking: booking._id });
-
-      // حذف الحجز نفسه
       await Booking.findByIdAndDelete(booking._id);
-      deletedCount = 1;
 
       return res.status(200).json({
         status: "success",
@@ -538,6 +544,7 @@ export const deleteBooking = async (req, res, next) => {
     next(err);
   }
 };
+
 export const filterBookings = async (req, res) => {
   try {
     const { userId, user } = req; // userId من JWT

@@ -100,6 +100,9 @@ if (req.file) {
         case "nationalId":
           message = "رقم الهوية مستخدم بالفعل";
           break;
+    case "phoneNumber": message = "رقم الهاتف مستخدم بالفعل"; break;
+
+
         default:
           message = "قيمة مكررة في أحد الحقول";
       }
