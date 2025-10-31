@@ -254,168 +254,195 @@ expandedSchedules.push({
   }
 };
 
+function parseTimeArabic(t) {
+  let [time, meridiem] = t.split(" ");
+  let [h, m] = time.split(":").map(Number);
+  if (meridiem === "م" && h !== 12) h += 12;
+  if (meridiem === "ص" && h === 12) h = 0;
+  return { h, m };
+}
+
+function conflictExists(allBookings, {
+  coach,
+  location,
+  startDT,
+  endDT,
+  ignoreScheduleId,
+  ignoreBookingId
+}) {
+  for (const booking of allBookings) {
+    // تجاهل الحجز الحالي فقط إذا محدد
+    if (ignoreBookingId && booking._id.toString() === ignoreBookingId) continue;
+
+    for (const s of booking.schedules) {
+      if (ignoreScheduleId && s._id.toString() === ignoreScheduleId) continue;
+
+      const scheduleStart = new Date(s.date);
+      const scheduleEnd = new Date(s.date);
+      const ts = parseTimeArabic(s.timeStart);
+      const te = parseTimeArabic(s.timeEnd);
+      scheduleStart.setHours(ts.h, ts.m);
+      scheduleEnd.setHours(te.h, te.m);
+
+      const overlap = startDT < scheduleEnd && endDT > scheduleStart;
+      if (!overlap) continue;
+
+      if (coach && s.coach?.toString() === coach.toString())
+        return { type: "coach", schedule: s };
+
+      if (location && s.location === location)
+        return { type: "location", schedule: s };
+    }
+  }
+  return null;
+}
+
 export const updateBooking = async (req, res) => {
   try {
-    const { groupId } = req.params;
-    const updateAllSameGroup = req.query.updateAllSameGroup === "true";
-    const { scheduleId } = req.query; 
-    const {
-      service,
-      description,
-      coachId,
+    const { id } = req.params;
+    const { scheduleId, updateAllSameGroup } = req.query;
+
+    let booking;
+
+    // 🔹 تحديد نوع التعديل
+    if (scheduleId) booking = await Booking.findById(id);
+    else if (updateAllSameGroup === "true") booking = await Booking.findOne({ groupId: id });
+    else booking = await Booking.findById(id);
+
+    if (!booking)
+      return res.status(404).json({ status: "error", message: "Booking not found" });
+
+    const today = new Date();
+    const allBookings = await Booking.find();
+
+// ================================
+// تعديل جدول واحد
+// ================================
+if (scheduleId) {
+  const schedule = booking.schedules.id(scheduleId);
+  if (!schedule) return res.status(404).json({ status: "error", message: "Schedule not found" });
+  if (new Date(schedule.date) < today) return res.status(400).json({ status: "error", message: "Cannot update past schedule" });
+
+  const newDate = new Date(req.body.date ?? schedule.date);
+  const ts = parseTimeArabic(req.body.timeStart ?? schedule.timeStart);
+  const te = parseTimeArabic(req.body.timeEnd ?? schedule.timeEnd);
+
+  const startDT = new Date(newDate); startDT.setHours(ts.h, ts.m);
+  const endDT = new Date(newDate); endDT.setHours(te.h, te.m);
+
+  // هنا نتجاهل الجدول نفسه فقط
+  const conflict = conflictExists(allBookings, {
+    coach: req.body.coach ?? schedule.coach,
+    location: req.body.location ?? schedule.location,
+    startDT,
+    endDT,
+    ignoreScheduleId: scheduleId,
+    ignoreBookingId: null
+  });
+
+  if (conflict)
+    return res.status(400).json({
+      status: "error",
+      message: conflict.type === "coach" ? "المدرب لديه حجز آخر في نفس الوقت" : "الغرفة محجوزة في نفس الوقت"
+    });
+
+  // تعديل الحقول
+  for (const key of ["date","coach","location","reminders","members","maxMembers","dayOfWeek","timeStart","timeEnd"])
+    if (req.body[key] !== undefined) schedule[key] = req.body[key];
+
+  await booking.save();
+  return res.status(200).json({ status: "success", message: "Schedule updated successfully", data: booking });
+}
+
+// ================================
+// تعديل الجروب كامل
+// ================================
+if (updateAllSameGroup === "true") {
+  const { service, description, coachId, location, schedules, reminders, members, maxMembers, subscriptionDuration, startDate } = req.body;
+
+  // حذف الجداول المستقبلية للحجز نفسه فقط
+  booking.schedules = booking.schedules.filter(s => new Date(s.date) < today);
+
+  const subscriptionMap = { "1day":1,"1week":7,"2weeks":14,"3weeks":21,"1month":30,"3months":90,"6months":180,"1year":365 };
+  const totalDays = subscriptionMap[subscriptionDuration] || 7;
+  const start = new Date(startDate);
+
+  // فلترة كل الجداول الأخرى لتجنب conflict مع نفس الحجز
+  const otherBookings = allBookings.map(b => {
+    if (b._id.toString() === booking._id.toString()) {
+      return { ...b._doc, schedules: [] }; // تجاهل جميع جداول هذا الحجز نفسه
+    }
+    return b;
+  });
+
+  const newSchedules = [];
+
+  for (let i = 0; i < totalDays; i++) {
+    const currentDate = new Date(start);
+    currentDate.setDate(start.getDate() + i);
+    const dayOfWeek = currentDate.getDay();
+    const match = schedules.find(s => s.dayOfWeek === dayOfWeek);
+    if (!match) continue;
+
+    const ts = parseTimeArabic(match.timeStart);
+    const te = parseTimeArabic(match.timeEnd);
+    const startDT = new Date(currentDate); startDT.setHours(ts.h, ts.m);
+    const endDT = new Date(currentDate); endDT.setHours(te.h, te.m);
+
+    const conflict = conflictExists(otherBookings, {
+      coach: coachId,
       location,
-      schedules, // array لو بدنا نعدل كل الجداول
+      startDT,
+      endDT,
+      ignoreScheduleId: null,
+      ignoreBookingId: null
+    });
+
+    if (conflict)
+      return res.status(400).json({
+        status: "error",
+        message: conflict.type === "coach" ? "المدرب لديه حجز آخر في نفس الوقت" : "الغرفة محجوزة في نفس الوقت",
+        conflictDate: currentDate
+      });
+
+    newSchedules.push({
+      _id: new mongoose.Types.ObjectId(),
+      dayOfWeek,
+      timeStart: match.timeStart,
+      timeEnd: match.timeEnd,
+      date: currentDate,
+      coach: coachId,
+      location,
       reminders,
       members,
       maxMembers,
-      subscriptionDuration,
-      startDate
-    } = req.body;
-
-    if (!groupId) return res.status(400).json({ status: "error", message: "groupId is required" });
-
-    const booking = await Booking.findOne({ groupId });
-    if (!booking) return res.status(404).json({ status: "error", message: "Booking group not found" });
-console.log("Schedules in this group:", booking.schedules.map(s => ({ id: s._id.toString(), date: s.date })));
-
-    let finalCoachId = coachId ?? booking.coachId;
-    if (req.user.role === "Coach") finalCoachId = req.user._id;
-
-    const today = new Date();
-
-    if (updateAllSameGroup) {
-      // حذف الجداول المستقبلية فقط
-      booking.schedules = booking.schedules.filter(s => new Date(s.date) < today);
-
-      // إنشاء الجداول الجديدة بنفس createBooking
-      const subscriptionMap = {
-        "1day": 1, "1week": 7, "2weeks": 14, "3weeks": 21, "1month": 30,
-        "3months": 90, "6months": 180, "1year": 365
-      };
-      const totalDays = subscriptionMap[subscriptionDuration] || 7;
-      const start = new Date(startDate);
-      const expandedSchedules = [];
-
-      const convertArabicTimeTo24Hour = (timeStr) => {
-        if (!timeStr) return null;
-        const [t, meridiem] = timeStr.split(" ");
-        let [h, m] = t.split(":").map(Number);
-        if (meridiem === "م" && h !== 12) h += 12;
-        if (meridiem === "ص" && h === 12) h = 0;
-        return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
-      };
-      const makeDT = (dateObj, timeArabic) => {
-        const d = new Date(dateObj);
-        const tt = convertArabicTimeTo24Hour(timeArabic);
-        if (!tt) return null;
-        const [hh, mm] = tt.split(":").map(Number);
-        d.setHours(hh, mm, 0, 0);
-        return d;
-      };
-
-      const conflictedDays = [];
-
-      for (let i = 0; i < totalDays; i++) {
-        const currentDate = new Date(start);
-        currentDate.setDate(start.getDate() + i);
-        const dayOfWeek = currentDate.getDay();
-        const daySchedule = schedules.find(s => s.dayOfWeek === dayOfWeek);
-        if (!daySchedule) continue;
-
-        const startDT = makeDT(currentDate, daySchedule.timeStart);
-        const endDT = makeDT(currentDate, daySchedule.timeEnd);
-
-        const conflictCoach = booking.schedules.some(s =>
-          s.coach.toString() === finalCoachId.toString() &&
-          startDT < makeDT(s.date, s.timeEnd) &&
-          endDT > makeDT(s.date, s.timeStart)
-        );
-        const conflictRoom = booking.schedules.some(s =>
-          s.location === location &&
-          startDT < makeDT(s.date, s.timeEnd) &&
-          endDT > makeDT(s.date, s.timeStart)
-        );
-        if (conflictCoach || conflictRoom) {
-          conflictedDays.push({ date: currentDate, reason: conflictCoach ? "Coach busy" : "Room busy" });
-          continue;
-        }
-
-        expandedSchedules.push({
-          _id: new mongoose.Types.ObjectId(),
-          dayOfWeek,
-          timeStart: daySchedule.timeStart,
-          timeEnd: daySchedule.timeEnd,
-          date: currentDate,
-          coach: finalCoachId,
-          location,
-          reminders,
-          members,
-          maxMembers,
-          groupId: booking.groupId,
-        });
-      }
-
-      booking.schedules.push(...expandedSchedules);
-      booking.service = service ?? booking.service;
-      booking.description = description ?? booking.description;
-      booking.startDate = new Date(startDate);
-      booking.subscriptionDuration = subscriptionDuration ?? booking.subscriptionDuration;
-      booking.maxMembers = maxMembers ?? booking.maxMembers;
-
-      await booking.save();
-      return res.status(200).json({ status: "success", message: "Booking group updated successfully", data: booking, conflictedDays });
-
-    } 
-else if (scheduleId) {
-  const today = new Date();
-
-  // نلقى الجدول داخل الجروب المحدد
-  const scheduleIndex = booking.schedules.findIndex(
-    s => s._id.toString() === scheduleId
-  );
-
-  if (scheduleIndex === -1) {
-    return res.status(404).json({
-      status: "error",
-      message: "Schedule not found in this group"
+      groupId: booking.groupId
     });
   }
 
-  const schedule = booking.schedules[scheduleIndex];
+  booking.schedules.push(...newSchedules);
+  booking.service = service ?? booking.service;
+  booking.description = description ?? booking.description;
+  booking.startDate = new Date(startDate);
+  booking.subscriptionDuration = subscriptionDuration;
+  booking.maxMembers = maxMembers;
 
-  // ما نعدل الماضي
-  if (new Date(schedule.date) < today) {
-    return res.status(400).json({
-      status: "error",
-      message: "Cannot update past schedule"
-    });
-  }
-
-  // تحديث الحقول مباشرة بدون أي فاليديشن على schedules
-  for (const key of ["date", "coach", "location", "reminders", "members", "maxMembers", "dayOfWeek", "timeStart", "timeEnd"]) {
-    if (req.body[key] !== undefined) {
-      schedule[key] = req.body[key];
-    }
-  }
-
-  // نحفظ
   await booking.save();
-
-  return res.status(200).json({
-    status: "success",
-    message: "Schedule updated successfully",
-    data: booking
-  });
+  return res.status(200).json({ status: "success", message: "Group updated successfully", data: booking });
 }
 
 
+    // ================================
+    // (C) تعديل بيانات booking نفسه
+    // ================================
+    if (req.body.service) booking.service = req.body.service;
+    if (req.body.description) booking.description = req.body.description;
 
-else {
-      return res.status(400).json({ status: "error", message: "Either updateAllSameGroup or scheduleId must be provided" });
-    }
+    await booking.save();
+    return res.status(200).json({ status: "success", message: "Booking updated", data: booking });
 
   } catch (err) {
-    console.error("Update booking error:", err);
+    console.error(err);
     return res.status(500).json({ status: "error", message: err.message });
   }
 };

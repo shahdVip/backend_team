@@ -115,72 +115,72 @@ export const createBookingSchema = Joi.object({
 
 // دالة تحويل الوقت لدقائق
 // دالة تحويل الوقت إلى دقائق للتحقق من الترتيب
-const timeToMinutes = (str) => {
-  if (!str) return null;
-  const match = /^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/.exec(str);
-  if (!match) return null;
-  let [_, h, m, period] = match;
-  h = Number(h);
-  m = Number(m);
-  if (period === "م" && h !== 12) h += 12;
-  if (period === "ص" && h === 12) h = 0;
-  return h * 60 + m;
-};
+// const timeToMinutes = (str) => {
+//   if (!str) return null;
+//   const match = /^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/.exec(str);
+//   if (!match) return null;
+//   let [_, h, m, period] = match;
+//   h = Number(h);
+//   m = Number(m);
+//   if (period === "م" && h !== 12) h += 12;
+//   if (period === "ص" && h === 12) h = 0;
+//   return h * 60 + m;
+// };
 
-export const updateBookingSchema = Joi.object({
-  // خصائص الجدول الفردية
-  scheduleId: Joi.string().optional(),
-  groupId: Joi.string().optional(),
-schedules: Joi.array()
-  .items(
-    Joi.object({
-      _id: Joi.string().required(),
-      dayOfWeek: Joi.number().min(0).max(6).optional(),
-      date: Joi.date().iso().optional(),
-      timeStart: Joi.string().pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/).optional(),
-      timeEnd: Joi.string().pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/).optional(),
-      coach: Joi.string().optional(),
-      location: Joi.string().optional(),
-      members: Joi.array().items(Joi.string()).optional(),
-      reminders: Joi.array().items(Joi.string()).optional(),
-      maxMembers: Joi.number().optional(),
-    })
-  )
-  .optional(),
+// export const updateBookingSchema = Joi.object({
+//   // خصائص الجدول الفردية
+//   scheduleId: Joi.string().optional(),
+//   groupId: Joi.string().optional(),
+// schedules: Joi.array()
+//   .items(
+//     Joi.object({
+//       _id: Joi.string().required(),
+//       dayOfWeek: Joi.number().min(0).max(6).optional(),
+//       date: Joi.date().iso().optional(),
+//       timeStart: Joi.string().pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/).optional(),
+//       timeEnd: Joi.string().pattern(/^([0-9]{1,2}):([0-9]{2})\s?(ص|م)$/).optional(),
+//       coach: Joi.string().optional(),
+//       location: Joi.string().optional(),
+//       members: Joi.array().items(Joi.string()).optional(),
+//       reminders: Joi.array().items(Joi.string()).optional(),
+//       maxMembers: Joi.number().optional(),
+//     })
+//   )
+//   .optional(),
 
-  service: Joi.string().optional(),
-  description: Joi.string().optional(),
-  startDate: Joi.date().iso().optional(),
-  subscriptionDuration: Joi.string().optional(),
-  coachId: Joi.string().optional(),
-  location: Joi.string().optional(),
-  maxMembers: Joi.number().optional(),
-  reminders: Joi.array().items(Joi.string()).optional(),
-  members: Joi.array().items(Joi.string()).optional(),
+//   service: Joi.string().optional(),
+//   description: Joi.string().optional(),
+//   startDate: Joi.date().iso().optional(),
+//   subscriptionDuration: Joi.string().optional(),
+//   coachId: Joi.string().optional(),
+//   location: Joi.string().optional(),
+//   maxMembers: Joi.number().optional(),
+//   reminders: Joi.array().items(Joi.string()).optional(),
+//   members: Joi.array().items(Joi.string()).optional(),
 
-  // flags
-  updateAllSameGroup: Joi.boolean().optional(),
-}).custom((value, helpers) => {
-  // تحقق من الوقت فقط إذا تم تعديل timeStart أو timeEnd
-  if (
-    (value.timeStart && !value.timeEnd) ||
-    (!value.timeStart && value.timeEnd)
-  ) {
-    return helpers.error("any.invalid", {
-      message: "يجب تمرير كل من timeStart و timeEnd معًا",
-    });
-  }
-  if (value.timeStart && value.timeEnd) {
-    const startMinutes = timeToMinutes(value.timeStart);
-    const endMinutes = timeToMinutes(value.timeEnd);
-    if (endMinutes <= startMinutes)
-      return helpers.error("any.invalid", {
-        message: "وقت النهاية يجب أن يكون بعد وقت البداية",
-      });
-  }
+//   // flags
+//   updateAllSameGroup: Joi.boolean().optional(),
+// }).custom((value, helpers) => {
+//   // تحقق من الوقت فقط إذا تم تعديل timeStart أو timeEnd
+//   if (
+//     (value.timeStart && !value.timeEnd) ||
+//     (!value.timeStart && value.timeEnd)
+//   ) {
+//     return helpers.error("any.invalid", {
+//       message: "يجب تمرير كل من timeStart و timeEnd معًا",
+//     });
+//   }
+//   if (value.timeStart && value.timeEnd) {
+//     const startMinutes = timeToMinutes(value.timeStart);
+//     const endMinutes = timeToMinutes(value.timeEnd);
+//     if (endMinutes <= startMinutes)
+//       return helpers.error("any.invalid", {
+//         message: "وقت النهاية يجب أن يكون بعد وقت البداية",
+//       });
+//   }
 
-  return value;
-}, "Time & schedule validation");
+//   return value;
+// }, "Time & schedule validation");
 
 // Validate MongoDB ObjectId
 export const validateObjectId = (paramName) => (req, res, next) => {

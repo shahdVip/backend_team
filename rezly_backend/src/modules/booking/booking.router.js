@@ -12,7 +12,6 @@ import {
 import { auth, roles } from "../../Middleware/auth.js";
 import {
   createBookingSchema,
-  updateBookingSchema,
   validateObjectId,
 } from "./booking.validation.js";
 import {
@@ -59,13 +58,8 @@ router.get(
   asyncHandler(getBookingDetails)
 );
 
-// تحديث حجز حسب ID (Admin & Coach)
-router.put(
-  "/:groupId",
-  auth([roles.Admin, roles.Coach]),
-  validateBookingUpdate(updateBookingSchema),
-  asyncHandler(updateBooking)
-);
+router.put("/:id", auth([roles.Admin, roles.Coach]), asyncHandler(updateBooking));
+
 
 // حذف حجز حسب ID (Admin فقط)
 router.delete(
