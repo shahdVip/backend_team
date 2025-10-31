@@ -8,6 +8,7 @@ import formRouter from "./modules/forms/forms.routers.js";
 import permissionsRouter from "./modules/permissions/permissions.router.js";
 import rolesRouter from "./modules/roles/roles.router.js";
 import employeesRouter from "./modules/employees/employees.router.js";
+import attendanceRouter from "./modules/attendance/attendance.router.js";
 
 import express from "express";
 const initApp = () => {
@@ -36,6 +37,7 @@ const initApp = () => {
   app.use("/permissions", permissionsRouter);
   app.use("/roles", rolesRouter);
   app.use("/employees", employeesRouter);
+  app.use("/attendance", attendanceRouter);
 
   app.use((err, req, res, next) => {
     const statusCode = err.statusCode || 500;

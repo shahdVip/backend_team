@@ -19,7 +19,7 @@ export const auth = (allowedRoles = []) => {
       if (!authorization || !authorization.startsWith("Bearer ")) {
         return res.status(401).json({
           status: "error",
-          message: "Unauthorized: Invalid or missing token",
+          message: "Unauthorized: Missing token",
           data: null,
         });
       }
@@ -27,54 +27,38 @@ export const auth = (allowedRoles = []) => {
       const token = authorization.split(" ")[1];
       let decoded;
 
-      // التحقق من صلاحية التوكن
+      // أولاً نحاول التحقق من الـ access token
       try {
         decoded = jwt.verify(token, process.env.LOGINTOKEN);
       } catch {
-        const userId = jwt.decode(token)?.id;
-        if (!userId) {
+        // إذا انتهى صلاحية الـ access token أو غير صالح، نبحث مباشرة عن المستخدم باستخدام refresh token
+        let account =
+          (await Employee.findOne({ refreshToken: token }).lean()) ||
+          (await userModel.findOne({ refreshToken: token }).lean());
+
+        if (!account) {
           return res.status(401).json({
             status: "error",
-            message: "Unauthorized: Invalid token",
+            message: "Unauthorized: Invalid or expired token",
             data: null,
           });
         }
 
-        // البحث عن المستخدم في جدول الموظفين أو المستخدمين
-        const account =
-          (await Employee.findById(userId).lean()) ||
-          (await userModel.findById(userId).lean());
+        // نستخدم بيانات المستخدم من refresh token
+        decoded = { id: account._id, role: account.role };
 
-        if (!account?.refreshToken) {
-          return res.status(401).json({
-            status: "error",
-            message: "Unauthorized: No refresh token found",
-            data: null,
-          });
-        }
-
-        try {
-          jwt.verify(account.refreshToken, process.env.REFRESHTOKEN_SECRET);
-          const newAccessToken = jwt.sign(
-            { id: account._id, role: account.role },
-            process.env.LOGINTOKEN,
-            { expiresIn: "15m" }
-          );
-          res.setHeader("x-access-token", newAccessToken);
-          decoded = { id: account._id, role: account.role };
-        } catch {
-          return res.status(401).json({
-            status: "error",
-            message: "Unauthorized: Refresh token expired",
-            data: null,
-          });
-        }
+        // إنشاء access token جديد
+        const newAccessToken = jwt.sign(
+          { id: account._id, role: account.role },
+          process.env.LOGINTOKEN,
+          { expiresIn: "15m" }
+        );
+        res.setHeader("x-access-token", newAccessToken);
       }
 
-      // 🔍 البحث في جدول الموظفين أولاً
+      // البحث عن المستخدم في DB (موظف أو مستخدم)
       let user =
         (await Employee.findById(decoded.id).select("username role").lean()) ||
-        // إذا مش موظف، يمكن يكون مشترك (Member)
         (await userModel.findById(decoded.id).select("userName role").lean());
 
       if (!user) {
@@ -87,16 +71,7 @@ export const auth = (allowedRoles = []) => {
 
       req.user = user;
       req.userId = decoded.id;
-
-      // تحديد اسم الدور
-      req.user.roleName = (user.roleId?.name || user.role || "")
-        .toString()
-        .toLowerCase();
-
-      // تحديد الصلاحيات (فقط للموظفين)
-      req.user.permissions = (user.roleId?.permissions || []).map((p) =>
-        (p.name || "").toString().toLowerCase()
-      );
+      req.user.roleName = (user.role || "").toString().toLowerCase();
 
       // التحقق من السماح بالدور
       if (allowedRoles.length) {
