@@ -6,6 +6,8 @@ import { Employee } from "../../../DB/models/employee.model.js";
 // ==================== عرض كود الحضور والانصراف ====================
 export const getAttendanceQRCodes = async (req, res, next) => {
   try {
+    const FRONTEND_URL = process.env.FRONTEND_URL || "http://192.168.1.9:5173";
+
     const qrCheckIn = await QRCode.toDataURL("CHECK_IN");
     const qrCheckOut = await QRCode.toDataURL("CHECK_OUT");
 
