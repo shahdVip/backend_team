@@ -127,6 +127,9 @@ export const employeeSignUp = async (req, res) => {
         case "nationalId":
           message = "رقم الهوية مستخدم بالفعل";
           break;
+    case "phoneNumber": message = "رقم الهاتف مستخدم بالفعل"; break;
+
+
         default:
           message = "قيمة مكررة في أحد الحقول";
       }
@@ -403,7 +406,8 @@ export const updateEmployee = async (req, res) => {
       .json({ message: "Error updating employee", error: error.message });
   }
 };
-export const createMemberprice = async (req, res, next) => {
+
+export const createMember = async (req, res, next) => {
   try {
     console.log("Request body:", req.body);
     if (req.user?.role !== "Admin") {
@@ -570,155 +574,7 @@ export const createMemberprice = async (req, res, next) => {
     next(error);
   }
 };
-
-export const createMember = async (req, res, next) => {
-  try {
-    if (req.user?.role !== "Admin") {
-      return next(new AppError("غير مصرح لك بإنشاء مشترك جديد", 403));
-    }
-    const {
-      firstName,
-      lastName,
-      gender,
-      idNumber,
-      birthDate,
-      phone,
-      startDate,
-      email,
-      city,
-      address,
-      image,
-      packageId,
-      paymentMethod,
-      coachId,
-    } = req.body;
-
-    const existingUser = await userModel.findOne({
-      $or: [{ email }, { idNumber }],
-    });
-    if (existingUser)
-      return next(
-        new AppError(
-          "المستخدم موجود مسبقًا بنفس البريد أو اسم المستخدم أو رقم الهوية",
-          409
-        )
-      );
-
-    // التأكد من وجود الباقة
-    const selectedPackage = await Package.findById(packageId);
-    if (!selectedPackage)
-      return next(new AppError("الاشتراك المحدد غير موجود", 404));
-
-    // إنشاء refresh token
-    const refreshToken = jwt.sign(
-      { id: new mongoose.Types.ObjectId() },
-      process.env.REFRESHTOKEN_SECRET,
-      { expiresIn: "30d" }
-    );
-
-    // حساب تاريخ انتهاء الاشتراك
-    let endDate = new Date();
-    const unit = selectedPackage.duration_unit.toLowerCase();
-    switch (unit) {
-      case "days":
-        endDate.setDate(endDate.getDate() + selectedPackage.duration_value);
-        break;
-      case "weeks":
-        endDate.setDate(endDate.getDate() + selectedPackage.duration_value * 7);
-        break;
-      case "months":
-        endDate.setMonth(endDate.getMonth() + selectedPackage.duration_value);
-        break;
-      case "years":
-        endDate.setFullYear(
-          endDate.getFullYear() + selectedPackage.duration_value
-        );
-        break;
-    }
-
-    // التأكد من وجود دور Member
-    let memberRole = await Role.findOne({ name: "Member" });
-    if (!memberRole) {
-      memberRole = await Role.create({
-        name: "Member",
-        description: "مشترك في النظام",
-        permissions: [],
-      });
-    }
-
-    // إنشاء العضو وحفظه
-    const member = await userModel.create({
-      firstName,
-      lastName,
-      gender,
-      idNumber,
-      birthDate,
-      phone,
-      email,
-      userName,
-      password,
-      address: `${city || ""} - ${address || ""}`,
-      image,
-      roleId: memberRole._id,
-      packageId: packageId, // ربط العضو بالباكيج
-      coachId: coachId,
-      paymentStatus: "مدفوع",
-      subscriptionStatus: "Active",
-      responsibleEmployee: req.user?._id,
-      startDate: startDate ? new Date(startDate) : new Date(), //اذا ما دخل تاريخ يحسبه تاريخ اليوم الحالي ,
-      endDate,
-      slug: `arabicSlugify(${firstName}-${lastName})`,
-      refreshToken,
-    });
-
-    // populate الدور + الباكيج + الموظف المسؤول
-    const populatedMember = await userModel
-      .findById(member._id)
-      .populate({ path: "roleId", select: "name description" })
-      .populate({
-        path: "packageId",
-        select: "name price_cents duration_value duration_unit price_type",
-      })
-      .populate({
-        path: "responsibleEmployee",
-        select: "firstName lastName email",
-      })
-      .populate({
-        path: "coachId",
-        select: "_id username firstName lastName email phoneNumber",
-      })
-      .lean();
-
-    // إنشاء توكن تأكيد البريد
-    const confirmToken = jwt.sign({ email }, process.env.CONFIRMEMAILTOKEN, {
-      expiresIn: "1h",
-    });
-    await sendEmail(email, "تأكيد الحساب في النظام", confirmToken);
-
-    // ربط العضو بالمدرب (إن وجد)
-    if (coachId) {
-      await userModel.findByIdAndUpdate(coachId, {
-        $push: { members: member._id },
-      });
-    }
-
-    // الرد النهائي
-    return res.status(201).json({
-      message: "تم إنشاء المشترك بنجاح",
-      member: populatedMember,
-      package: {
-        name: selectedPackage.name,
-        price: selectedPackage.price_cents / 100,
-        duration: `${selectedPackage.duration_value} ${selectedPackage.duration_unit}`,
-        paymentMethod,
-      },
-    });
-  } catch (error) {
-    next(error);
-    console.log(error);
-  }
-};
-/// سمحت بتعديل الايميل ورقم الهاتف مع اني مش حاسة انه منطقي
+/// سمحت بتعديل الايميل ورقم الهاتف مع اني مش حاسة انه منطقي 
 export const updateMember = async (req, res, next) => {
   try {
     const { id } = req.params;

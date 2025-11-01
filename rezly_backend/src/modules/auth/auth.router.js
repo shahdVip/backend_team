@@ -13,7 +13,6 @@ router.post('/SignUp',validation(schema.signUpSchema),asyncHandler (authControll
 
 router.post('/SignIn',validation(schema.SignInSchema),asyncHandler(authController.SignIn));
 
-router.post("/addNewMember3", auth([ roles.Admin]), asyncHandler(authController.createMemberprice));
 
 router.post("/addNewMember", auth([ roles.Admin]), validation(schema.createMemberSchema), asyncHandler(authController.createMember));
 router.put("/updateMember/:id", auth([ roles.Admin]), validation(schema.updateMemberSchema), asyncHandler(authController.updateMember));
