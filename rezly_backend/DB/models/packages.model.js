@@ -1,4 +1,3 @@
-
 import { Schema, model } from "mongoose";
 import slugify from "slugify";
 
@@ -41,6 +40,7 @@ const packageSchema = new Schema(
     duration_unit: {
       type: String,
       required: true,
+      enum: ["Days", "Weeks", "Months", "Years", "يوم", "أيام"],
     },
     auto_renew: {
       type: Boolean,
@@ -55,12 +55,12 @@ const packageSchema = new Schema(
       type: Boolean,
       default: true,
     },
-    startDate: { 
-      type: Date 
+    startDate: {
+      type: Date,
     },
-    endDate: { 
-      type: Date
-     },   
+    endDate: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

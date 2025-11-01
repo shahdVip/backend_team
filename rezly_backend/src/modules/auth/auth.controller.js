@@ -13,16 +13,27 @@ import Package from "../../../DB/models/packages.model.js";
 
 import crypto from "crypto";
 
-
-
 export const employeeSignUp = async (req, res) => {
   try {
     const {
-      firstName,lastName,birthDate,nationalId,gender, phoneNumber,
-      email,address,jobTitle,department,contractType,startDate,
-      username, password, role,notes,
+      firstName,
+      lastName,
+      birthDate,
+      nationalId,
+      gender,
+      phoneNumber,
+      email,
+      address,
+      jobTitle,
+      department,
+      contractType,
+      startDate,
+      username,
+      password,
+      role,
+      notes,
     } = req.body;
-    
+
     const { error } = employeeSchema.validate(req.body, { abortEarly: false });
     if (error) {
       return res.status(400).json({
@@ -45,25 +56,41 @@ export const employeeSignUp = async (req, res) => {
     // ===== معالجة الصورة (تشفر وتخزن كـ Base64) =====
     let encryptedImage = "";
 
-if (req.file) {
-  const key = Buffer.from(process.env.IMAGE_ENCRYPTION_KEY, "hex"); // لازم 32 بايت
-  const iv = crypto.randomBytes(16);
+    if (req.file) {
+      const key = Buffer.from(process.env.IMAGE_ENCRYPTION_KEY, "hex"); // لازم 32 بايت
+      const iv = crypto.randomBytes(16);
 
-  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
-  const encrypted = Buffer.concat([cipher.update(req.file.buffer), cipher.final()]);
+      const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+      const encrypted = Buffer.concat([
+        cipher.update(req.file.buffer),
+        cipher.final(),
+      ]);
 
-  encryptedImage = {
-    data: encrypted, // ❌ هنا احذف toString("base64")
-    iv: iv.toString("hex"),
-    mimetype: req.file.mimetype,
-  };
-}
+      encryptedImage = {
+        data: encrypted, // ❌ هنا احذف toString("base64")
+        iv: iv.toString("hex"),
+        mimetype: req.file.mimetype,
+      };
+    }
 
     const newEmployee = new Employee({
-      firstName,lastName,birthDate,image: encryptedImage,
-      nationalId, gender, phoneNumber,email,address,
-      jobTitle,department,contractType,startDate,
-      username,password: hashedPassword,role,notes,
+      firstName,
+      lastName,
+      birthDate,
+      image: encryptedImage,
+      nationalId,
+      gender,
+      phoneNumber,
+      email,
+      address,
+      jobTitle,
+      department,
+      contractType,
+      startDate,
+      username,
+      password: hashedPassword,
+      role,
+      notes,
       confirmEmail: false,
       refreshToken,
       active: true,
@@ -110,12 +137,11 @@ if (req.file) {
       return res.status(400).json({ errors: [message] });
     }
 
-  console.log("❌ Error while creating account:", error);
+    console.log("❌ Error while creating account:", error);
 
-res.status(500).json({
-  message: "حدث خطأ أثناء إنشاء الحساب",
-});
-
+    res.status(500).json({
+      message: "حدث خطأ أثناء إنشاء الحساب",
+    });
   }
 };
 
@@ -127,15 +153,15 @@ export const getEmployeeImage = async (req, res) => {
       return res.status(404).json({ message: "Image not found" });
     }
 
+    const key = Buffer.from(process.env.IMAGE_ENCRYPTION_KEY, "hex");
+    const iv = Buffer.from(employee.image.iv, "hex");
 
-
-const key = Buffer.from(process.env.IMAGE_ENCRYPTION_KEY, "hex");
-const iv = Buffer.from(employee.image.iv, "hex");
-
-// فك التشفير مباشرة من الـ Buffer المخزن
-const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
-const decrypted = Buffer.concat([decipher.update(employee.image.data), decipher.final()]);
-
+    // فك التشفير مباشرة من الـ Buffer المخزن
+    const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+    const decrypted = Buffer.concat([
+      decipher.update(employee.image.data),
+      decipher.final(),
+    ]);
 
     // 4️⃣ إرسال الصورة مباشرة للفرونت
     res.writeHead(200, {
@@ -143,17 +169,18 @@ const decrypted = Buffer.concat([decipher.update(employee.image.data), decipher.
       "Content-Length": decrypted.length,
     });
     res.end(decrypted);
-    
   } catch (error) {
     console.error("Error decrypting image:", error);
-    res.status(500).json({ message: "Error decrypting image", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error decrypting image", error: error.message });
   }
 };
 
 export const getAllEmployees = async (req, res) => {
   try {
     const { id, role } = req.query;
-    const query = { active: true}; // 🔹 أضفنا الشرط هون
+    const query = { active: true }; // 🔹 أضفنا الشرط هون
 
     if (id) query._id = id;
     if (role) query.role = role;
@@ -174,9 +201,14 @@ export const getAllEmployees = async (req, res) => {
             decipher.update(emp.image.data, "base64"),
             decipher.final(),
           ]);
-          imageBase64 = `data:${emp.image.mimetype};base64,${decrypted.toString("base64")}`;
+          imageBase64 = `data:${emp.image.mimetype};base64,${decrypted.toString(
+            "base64"
+          )}`;
         } catch (err) {
-          console.warn(`Cannot decrypt image for employee ${emp._id}:`, err.message);
+          console.warn(
+            `Cannot decrypt image for employee ${emp._id}:`,
+            err.message
+          );
           imageBase64 = null; // نتجنب الكراش
         }
       }
@@ -200,13 +232,17 @@ export const getAllEmployees = async (req, res) => {
   }
 };
 
-
 export const updateRole = async (req, res) => {
   try {
-    const { id,role } = req.params; // ID الموظف اللي بدنا نغير دوره
+    const { id, role } = req.params; // ID الموظف اللي بدنا نغير دوره
 
-  
-    const validRoles = ["Admin", "Coach", "Accountant", "Receptionist", "Member"];
+    const validRoles = [
+      "Admin",
+      "Coach",
+      "Accountant",
+      "Receptionist",
+      "Member",
+    ];
     if (!role || !validRoles.includes(role)) {
       return res.status(400).json({
         status: "error",
@@ -244,7 +280,6 @@ export const updateRole = async (req, res) => {
     });
   }
 };
-
 
 export const deleteEmployee = async (req, res) => {
   try {
@@ -374,41 +409,56 @@ export const updateEmployee = async (req, res) => {
 
 export const createMember = async (req, res, next) => {
   try {
+    console.log("Request body:", req.body);
     if (req.user?.role !== "Admin") {
       return next(new AppError("غير مصرح لك بإنشاء مشترك جديد", 403));
     }
-const {
-  userName,
-  firstName,
-  lastName,
-  gender,
-  idNumber,
-  birthDate,
-  phone,
-  startDate,
-  email,
-  city,
-  address,
-  image,
-  packageId,
-  paymentMethod,
-  coachId,
-  password,
-  fees,
-} = req.body;
 
-    const existingUser = await userModel.findOne({ $or: [{ email }, { idNumber }] });
+    const {
+      userName,
+      firstName,
+      lastName,
+      gender,
+      idNumber,
+      birthDate,
+      phone,
+      startDate,
+      email,
+      city,
+      address,
+      image,
+      packageId,
+      paymentMethod,
+      coachId,
+      password,
+      fees,
+    } = req.body;
+
+    // ✅ التحقق من وجود اسم المستخدم وكلمة المرور
+    if (!userName && !firstName && !lastName) {
+      return next(new AppError("اسم المستخدم أو الاسم الكامل مطلوب", 400));
+    }
+
+    const finalUserName = userName || `user_${new mongoose.Types.ObjectId()}`;
+    if (!password) return next(new AppError("كلمة المرور مطلوبة", 400));
+
+    // التحقق من وجود مستخدم بنفس البريد أو رقم الهوية
+    const existingUser = await userModel.findOne({
+      $or: [{ email }, { idNumber }],
+    });
     if (existingUser)
-      return next(new AppError("المستخدم موجود مسبقًا بنفس البريد أو رقم الهوية", 409));
+      return next(
+        new AppError("المستخدم موجود مسبقًا بنفس البريد أو رقم الهوية", 409)
+      );
 
     // التأكد من وجود الباقة
     const selectedPackage = await Package.findById(packageId);
     if (!selectedPackage)
       return next(new AppError("الاشتراك المحدد غير موجود", 404));
 
-    // ✅ تحديث سعر الباقة بما أدخله المستخدم
+    // تحديث سعر الباقة إذا أدخل المستخدم قيمة
     if (fees) {
-      selectedPackage.price_cents = Math.round(fees * 100); // نحول إلى سنتات (لو السعر بالدولار)
+      selectedPackage.price_cents = Math.round(fees * 100);
       await selectedPackage.save();
     }
 
@@ -423,10 +473,22 @@ const {
     let endDate = new Date();
     const unit = selectedPackage.duration_unit.toLowerCase();
     switch (unit) {
-      case "days": endDate.setDate(endDate.getDate() + selectedPackage.duration_value); break;
-      case "weeks": endDate.setDate(endDate.getDate() + selectedPackage.duration_value * 7); break;
-      case "months": endDate.setMonth(endDate.getMonth() + selectedPackage.duration_value); break;
-      case "years": endDate.setFullYear(endDate.getFullYear() + selectedPackage.duration_value); break;
+      case "days":
+      case "يوم":
+      case "أيام":
+        endDate.setDate(endDate.getDate() + selectedPackage.duration_value);
+        break;
+      case "weeks":
+        endDate.setDate(endDate.getDate() + selectedPackage.duration_value * 7);
+        break;
+      case "months":
+        endDate.setMonth(endDate.getMonth() + selectedPackage.duration_value);
+        break;
+      case "years":
+        endDate.setFullYear(
+          endDate.getFullYear() + selectedPackage.duration_value
+        );
+        break;
     }
 
     // التأكد من وجود دور Member
@@ -441,6 +503,8 @@ const {
 
     // إنشاء العضو
     const member = await userModel.create({
+      userName: finalUserName,
+      password,
       firstName,
       lastName,
       gender,
@@ -458,29 +522,43 @@ const {
       responsibleEmployee: req.user?._id,
       startDate: startDate ? new Date(startDate) : new Date(),
       endDate,
-      slug: `arabicSlugify(${firstName}-${lastName})`,
+      slug: arabicSlugify(`${firstName}-${lastName}`),
       refreshToken,
     });
 
     // populate البيانات
-    const populatedMember = await userModel.findById(member._id)
+    const populatedMember = await userModel
+      .findById(member._id)
       .populate({ path: "roleId", select: "name description" })
-      .populate({ path: "packageId", select: "name price_cents duration_value duration_unit price_type" })
-      .populate({ path: "responsibleEmployee", select: "firstName lastName email" })
-      .populate({ path: "coachId", select: "_id username firstName lastName email phoneNumber" })
+      .populate({
+        path: "packageId",
+        select: "name price_cents duration_value duration_unit price_type",
+      })
+      .populate({
+        path: "responsibleEmployee",
+        select: "firstName lastName email",
+      })
+      .populate({
+        path: "coachId",
+        select: "_id username firstName lastName email phoneNumber",
+      })
       .lean();
 
     // إرسال إيميل تأكيد
-    const confirmToken = jwt.sign({ email }, process.env.CONFIRMEMAILTOKEN, { expiresIn: "1h" });
+    const confirmToken = jwt.sign({ email }, process.env.CONFIRMEMAILTOKEN, {
+      expiresIn: "1h",
+    });
     await sendEmail(email, "تأكيد الحساب في النظام", confirmToken);
 
     // ربط العضو بالمدرب
     if (coachId) {
-      await userModel.findByIdAndUpdate(coachId, { $push: { members: member._id } });
+      await userModel.findByIdAndUpdate(coachId, {
+        $push: { members: member._id },
+      });
     }
 
     // الرد النهائي
-    return res.status(201).json({
+    return res.status(200).json({
       message: "تم إنشاء المشترك بنجاح",
       member: populatedMember,
       package: {
@@ -488,42 +566,57 @@ const {
         price: selectedPackage.price_cents / 100,
         duration: `${selectedPackage.duration_value} ${selectedPackage.duration_unit}`,
         paymentMethod,
-        updatedPrice: fees ? fees : selectedPackage.price_cents / 100, // السعر المُدخل (إن وُجد)
+        updatedPrice: fees ? fees : selectedPackage.price_cents / 100,
       },
     });
-
   } catch (error) {
-    next(error);
     console.error(error);
+    next(error);
   }
 };
 /// سمحت بتعديل الايميل ورقم الهاتف مع اني مش حاسة انه منطقي 
 export const updateMember = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const {firstName,lastName,phone,email,city,address,image,password,packageId,paymentMethod,coachId,
+    const {
+      firstName,
+      lastName,
+      phone,
+      email,
+      city,
+      address,
+      image,
+      password,
+      packageId,
+      paymentMethod,
+      coachId,
     } = req.body;
 
     if (req.user.role !== "Admin") {
       return next(new AppError("غير مصرح لك بتعديل بيانات الأعضاء", 403));
     }
 
-    const member = await userModel.findById(id); 
+    const member = await userModel.findById(id);
     if (!member) {
       return next(new AppError("المشترك غير موجود", 404));
     }
 
     const duplicate = await userModel.findOne({
-      _id: { $ne: id }, 
+      _id: { $ne: id },
       $or: [{ email }, { phone }],
     });
 
     if (duplicate) {
-      return next(new AppError("البريد الإلكتروني أو رقم الهاتف مستخدم مسبقًا", 409));
+      return next(
+        new AppError("البريد الإلكتروني أو رقم الهاتف مستخدم مسبقًا", 409)
+      );
     }
 
     if (password) {
-      member.password = await bcrypt.hash(password, parseInt(process.env.SALTROUND));
+      member.password = await bcrypt.hash(
+        password,
+        parseInt(process.env.SALTROUND)
+      );
     }
 
     // تعديل الحقول المسموح بها فقط
@@ -534,7 +627,9 @@ export const updateMember = async (req, res, next) => {
     if (city || address)
       member.address = `${city || ""} - ${address || ""}.trim()`;
     if (image) member.image = image;
-    member.slug = arabicSlugify(`${member.firstName}-${member.lastName}-${member.userName}`);
+    member.slug = arabicSlugify(
+      `${member.firstName}-${member.lastName}-${member.userName}`
+    );
 
     if (packageId) {
       const selectedPackage = await Package.findById(packageId);
@@ -554,13 +649,17 @@ export const updateMember = async (req, res, next) => {
           endDate.setDate(endDate.getDate() + selectedPackage.duration_value);
           break;
         case "weeks":
-          endDate.setDate(endDate.getDate() + selectedPackage.duration_value * 7);
+          endDate.setDate(
+            endDate.getDate() + selectedPackage.duration_value * 7
+          );
           break;
         case "months":
           endDate.setMonth(endDate.getMonth() + selectedPackage.duration_value);
           break;
         case "years":
-          endDate.setFullYear(endDate.getFullYear() + selectedPackage.duration_value);
+          endDate.setFullYear(
+            endDate.getFullYear() + selectedPackage.duration_value
+          );
           break;
       }
       member.endDate = endDate;
@@ -649,11 +748,21 @@ export const getAllMembers = async (req, res, next) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const members = await userModel.find(filter)
+    const members = await userModel
+      .find(filter)
       .populate({ path: "roleId", select: "name description" })
-      .populate({ path: "packageId", select: "name price_cents duration_value duration_unit price_type" })
-      .populate({ path: "responsibleEmployee", select: "firstName lastName email" })
-      .populate({ path: "coachId", select: "_id username firstName lastName email phoneNumber" })
+      .populate({
+        path: "packageId",
+        select: "name price_cents duration_value duration_unit price_type",
+      })
+      .populate({
+        path: "responsibleEmployee",
+        select: "firstName lastName email",
+      })
+      .populate({
+        path: "coachId",
+        select: "_id username firstName lastName email phoneNumber",
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
@@ -705,8 +814,7 @@ export const toggleEmployeeStatus = async (req, res) => {
       message: `تم ${isActive ? "تفعيل" : "تعطيل"} الحساب بنجاح`,
       employee,
     });
-  } 
-  catch (err) {
+  } catch (err) {
     console.error("Error updating employee status:", err);
     res.status(500).json({
       message: "حدث خطأ أثناء تحديث حالة الحساب",
@@ -716,8 +824,9 @@ export const toggleEmployeeStatus = async (req, res) => {
 };
 
 export const SignUp = async (req, res, next) => {
-    try {
-        const { userName, email, password, phone, gender, midicalIssue, role } = req.body;
+  try {
+    const { userName, email, password, phone, gender, midicalIssue, role } =
+      req.body;
 
     // تحقق من وجود المستخدم مع استخدام projection أصغر لتسريع الاستعلام
     const existingUser = await userModel.findOne({ email }).lean();
@@ -734,17 +843,19 @@ export const SignUp = async (req, res, next) => {
       { expiresIn: "30d" }
     );
 
-        const newUser = await userModel.create({
-            userName,
-            email,
-            password: passwordHashed,
-            phone,
-            gender,
-            midicalIssue,
-            role,
-            slug: arabicSlugify(`${userName.trim()}-${new mongoose.Types.ObjectId()}`),
-            refreshToken
-        });
+    const newUser = await userModel.create({
+      userName,
+      email,
+      password: passwordHashed,
+      phone,
+      gender,
+      midicalIssue,
+      role,
+      slug: arabicSlugify(
+        `${userName.trim()}-${new mongoose.Types.ObjectId()}`
+      ),
+      refreshToken,
+    });
 
     // أضف expiresIn لتوكن تأكيد الإيميل لتحسين الأمان
     const token = jwt.sign(
@@ -991,5 +1102,3 @@ export const forgotpassword = async (req, res, next) => {
     next(error);
   }
 };
-
-
