@@ -1,7 +1,6 @@
 import Joi from "joi";
 import { generalFeilds } from "../../Middleware/validation.js";
 export const signUpSchema = Joi.object({
-
   email: generalFeilds.email,
   password: generalFeilds.password,
   cpassword: Joi.string().valid(Joi.ref("password")).required().messages({
@@ -11,22 +10,23 @@ export const signUpSchema = Joi.object({
 
   phone: generalFeilds.phone,
 
-      
-    role: Joi.string().valid('Member','Admin','Coach','Receptionist').optional().messages({
-      'any.only': 'Role must be either Coach or Admin  or Member or Receptionist',
+  role: Joi.string()
+    .valid("Member", "Admin", "Coach", "Receptionist")
+    .optional()
+    .messages({
+      "any.only":
+        "Role must be either Coach or Admin  or Member or Receptionist",
     }),
 
-    gender: Joi.string().valid('Male', 'Female').required().messages({
-  'string.empty': 'Gender is required',
-  'any.only': 'Gender must be either "Male" or "Female"'
-}),
+  gender: Joi.string().valid("Male", "Female").required().messages({
+    "string.empty": "Gender is required",
+    "any.only": 'Gender must be either "Male" or "Female"',
+  }),
 
-midicalIssue: Joi.string().max(255).allow('').messages({
-  'string.max': 'Medical issue cannot exceed 255 characters'
-}),
-
-
-})
+  midicalIssue: Joi.string().max(255).allow("").messages({
+    "string.max": "Medical issue cannot exceed 255 characters",
+  }),
+});
 export const SignInSchema = Joi.object({
   identifier: Joi.required().messages({
     "any.required": "Username or Email is required",
@@ -73,13 +73,13 @@ export const employeeSchema = Joi.object({
   }),
   image: Joi.any().optional().strip(),
 
- nationalId: Joi.string()
-  .pattern(/^\d{9}$/)
-  .required()
-  .messages({
-    "any.required": "رقم الهوية مطلوب",
-    "string.pattern.base": "رقم الهوية يجب أن يحتوي على 9 أرقام",
-  }),
+  nationalId: Joi.string()
+    .pattern(/^\d{9}$/)
+    .required()
+    .messages({
+      "any.required": "رقم الهوية مطلوب",
+      "string.pattern.base": "رقم الهوية يجب أن يحتوي على 9 أرقام",
+    }),
 
   gender: Joi.string().valid("ذكر", "أنثى").required().messages({
     "any.only": "اختر جنس صحيح",
@@ -102,12 +102,9 @@ export const employeeSchema = Joi.object({
   department: Joi.string().required().messages({
     "any.required": "القسم مطلوب",
   }),
-  contractType: Joi.string()
-    .valid("كامل", "جزئي","مؤقت")
-    .required()
-    .messages({
-      "any.only": "اختر نوع عقد صالح",
-    }),
+  contractType: Joi.string().valid("كامل", "جزئي", "مؤقت").required().messages({
+    "any.only": "اختر نوع عقد صالح",
+  }),
   startDate: Joi.date().required().messages({
     "date.base": "تاريخ بداية العمل غير صالح",
   }),
@@ -150,7 +147,13 @@ export const employeeUpdateSchema = Joi.object({
   notes: Joi.string().optional(),
 }).unknown(true); // يسمح بأي حقل إضافي مثل id بدون مشكلة
 export const createMemberSchema = Joi.object({
-  
+  userName: Joi.string().optional().allow("").messages({
+    "string.base": "اسم المستخدم غير صالح",
+  }),
+  password: Joi.string().optional().allow("").messages({
+    "string.base": "كلمة المرور غير صالحة",
+  }),
+
   firstName: Joi.string().required().messages({
     "string.empty": "الاسم الأول مطلوب",
   }),
@@ -179,20 +182,20 @@ export const createMemberSchema = Joi.object({
   address: Joi.string().optional().allow(""),
   image: Joi.string().uri().optional().allow(""),
   notes: Joi.string().optional().allow(""),
-  startDate: Joi.date()
-    .min("now")
-    .optional()
-    .messages({
-      "date.base": "تاريخ البدء غير صالح",
-      "date.min": "تاريخ البدء يجب أن يكون اليوم أو مستقبلًا",
-    }),
+  startDate: Joi.date().min("now").optional().messages({
+    "date.base": "تاريخ البدء غير صالح",
+    "date.min": "تاريخ البدء يجب أن يكون اليوم أو مستقبلًا",
+  }),
   packageId: Joi.string().required().messages({
     "string.empty": "الاشتراك مطلوب",
   }),
-  paymentMethod: Joi.string().valid("نقداً", "بطاقة", "أونلاين").required().messages({
-    "any.only": "طريقة الدفع غير صحيحة",
-    "string.empty": "طريقة الدفع مطلوبة",
-  }),
+  paymentMethod: Joi.string()
+    .valid("نقداً", "بطاقة", "أونلاين")
+    .required()
+    .messages({
+      "any.only": "طريقة الدفع غير صحيحة",
+      "string.empty": "طريقة الدفع مطلوبة",
+    }),
   coachId: Joi.string().optional().allow(""),
 });
 
@@ -220,11 +223,8 @@ export const updateMemberSchema = Joi.object({
       "any.only": "طريقة الدفع غير صحيحة",
     }),
   coachId: Joi.string().optional().allow(""),
-  startDate: Joi.date()
-    .min("now")
-    .optional()
-    .messages({
-      "date.base": "تاريخ البدء غير صالح",
-      "date.min": "تاريخ البدء يجب أن يكون اليوم أو مستقبلًا",
-    }),
+  startDate: Joi.date().min("now").optional().messages({
+    "date.base": "تاريخ البدء غير صالح",
+    "date.min": "تاريخ البدء يجب أن يكون اليوم أو مستقبلًا",
+  }),
 }).unknown(true);

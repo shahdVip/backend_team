@@ -127,8 +127,9 @@ export const employeeSignUp = async (req, res) => {
         case "nationalId":
           message = "رقم الهوية مستخدم بالفعل";
           break;
-    case "phoneNumber": message = "رقم الهاتف مستخدم بالفعل"; break;
-
+        case "phoneNumber":
+          message = "رقم الهاتف مستخدم بالفعل";
+          break;
 
         default:
           message = "قيمة مكررة في أحد الحقول";
@@ -415,7 +416,6 @@ export const createMember = async (req, res, next) => {
     }
 
     const {
-      userName,
       firstName,
       lastName,
       gender,
@@ -430,17 +430,16 @@ export const createMember = async (req, res, next) => {
       packageId,
       paymentMethod,
       coachId,
-      password,
+
       fees,
     } = req.body;
 
     // ✅ التحقق من وجود اسم المستخدم وكلمة المرور
-    if (!userName && !firstName && !lastName) {
+    if (!firstName && !lastName) {
       return next(new AppError("اسم المستخدم أو الاسم الكامل مطلوب", 400));
     }
 
-    const finalUserName = userName || `user_${new mongoose.Types.ObjectId()}`;
-    if (!password) return next(new AppError("كلمة المرور مطلوبة", 400));
+    const finalUserName = `${firstName}_${phone}`;
 
     // التحقق من وجود مستخدم بنفس البريد أو رقم الهوية
     const existingUser = await userModel.findOne({
@@ -504,7 +503,6 @@ export const createMember = async (req, res, next) => {
     // إنشاء العضو
     const member = await userModel.create({
       userName: finalUserName,
-      password,
       firstName,
       lastName,
       gender,
@@ -574,7 +572,7 @@ export const createMember = async (req, res, next) => {
     next(error);
   }
 };
-/// سمحت بتعديل الايميل ورقم الهاتف مع اني مش حاسة انه منطقي 
+/// سمحت بتعديل الايميل ورقم الهاتف مع اني مش حاسة انه منطقي
 export const updateMember = async (req, res, next) => {
   try {
     const { id } = req.params;
