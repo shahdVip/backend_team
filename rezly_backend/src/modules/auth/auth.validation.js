@@ -199,6 +199,22 @@ export const createMemberSchema = Joi.object({
   coachId: Joi.string().optional().allow(""),
 });
 
+export const setPasswordSchema = Joi.object({
+  emailOrUserName: Joi.string().required().messages({
+    "string.empty": "الرجاء إدخال الإيميل أو اسم المستخدم",
+    "any.required": "الإيميل أو اسم المستخدم مطلوب",
+  }),
+
+  password: Joi.string().min(6).required().messages({
+    "string.min": "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
+    "any.required": "كلمة المرور مطلوبة",
+  }),
+
+  confirmPassword: Joi.any().valid(Joi.ref("password")).required().messages({
+    "any.only": "تأكيد كلمة المرور لا يطابق كلمة المرور",
+    "any.required": "تأكيد كلمة المرور مطلوب",
+  }),
+});
 export const updateMemberSchema = Joi.object({
   firstName: Joi.string().optional().messages({
     "string.empty": "الاسم الأول مطلوب",

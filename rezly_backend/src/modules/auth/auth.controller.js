@@ -780,6 +780,46 @@ export const getAllMembers = async (req, res, next) => {
     next(error);
   }
 };
+
+export const setPassword = async (req, res) => {
+  try {
+    const { emailOrUserName, password } = req.body;
+
+    // بحث عن المستخدم
+    const user = await userModel.findOne({
+      $or: [
+        { email: emailOrUserName.toLowerCase() },
+        { userName: emailOrUserName },
+      ],
+    });
+
+    if (!user)
+      return res
+        .status(404)
+        .json({ status: "error", message: "المستخدم غير موجود" });
+
+    // تحقق إنه ما عنده باسوورد مسبقًا
+    if (user.password)
+      return res
+        .status(400)
+        .json({ status: "error", message: "تم تعيين كلمة مرور سابقًا" });
+
+    // هش الباسوورد واحفظه
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+    await user.save();
+
+    return res.status(200).json({
+      status: "success",
+      message: "تم تعيين كلمة المرور بنجاح",
+    });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ status: "error", message: "حدث خطأ في الخادم" });
+  }
+};
 export const toggleEmployeeStatus = async (req, res) => {
   try {
     const { id, active } = req.query; // الاثنين من الكويري
